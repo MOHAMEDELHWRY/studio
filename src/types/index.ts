@@ -7,4 +7,5 @@ export type Transaction = {
   description: string;
   debit: number;
   credit: number;
+  otherAdditions?: number;
 };

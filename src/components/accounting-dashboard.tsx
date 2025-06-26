@@ -16,7 +16,7 @@ import {
   Calendar as CalendarIcon,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { type Transaction } from '@/types';
@@ -45,17 +45,18 @@ const transactionSchema = z.object({
   type: z.string().min(1, 'النوع مطلوب.'),
   quantity: z.coerce.number().min(0, 'الكمية يجب أن تكون موجبة.'),
   price: z.coerce.number().min(0, 'السعر يجب أن يكون موجبًا.'),
+  otherAdditions: z.coerce.number().optional(),
   description: z.string().min(1, 'الوصف مطلوب.'),
   movement: z.enum(['debit', 'credit'], { required_error: 'يجب تحديد نوع الحركة.' }),
   amount: z.coerce.number().min(0.01, 'المبلغ يجب أن يكون أكبر من صفر.'),
 });
 
 const initialTransactions: Transaction[] = [
-  { id: '1', date: new Date('2023-10-01'), type: 'مبيعات', quantity: 10, price: 150, description: 'بيع أجهزة إلكترونية', debit: 1500, credit: 0 },
-  { id: '2', date: new Date('2023-10-05'), type: 'مشتريات', quantity: 5, price: 80, description: 'شراء مواد خام', debit: 0, credit: 400 },
-  { id: '3', date: new Date('2023-11-12'), type: 'راتب', quantity: 1, price: 3000, description: 'راتب موظف', debit: 0, credit: 3000 },
-  { id: '4', date: new Date('2023-11-20'), type: 'مبيعات', quantity: 20, price: 100, description: 'بيع برمجيات', debit: 2000, credit: 0 },
-  { id: '5', date: new Date('2023-12-15'), type: 'إيجار', quantity: 1, price: 1200, description: 'إيجار المكتب', debit: 0, credit: 1200 },
+  { id: '1', date: new Date('2023-10-01'), type: 'مبيعات', quantity: 10, price: 150, description: 'بيع أجهزة إلكترونية', debit: 1500, credit: 0, otherAdditions: 0 },
+  { id: '2', date: new Date('2023-10-05'), type: 'مشتريات', quantity: 5, price: 80, description: 'شراء مواد خام', debit: 0, credit: 400, otherAdditions: 0 },
+  { id: '3', date: new Date('2023-11-12'), type: 'راتب', quantity: 1, price: 3000, description: 'راتب موظف', debit: 0, credit: 3000, otherAdditions: 0 },
+  { id: '4', date: new Date('2023-11-20'), type: 'مبيعات', quantity: 20, price: 100, description: 'بيع برمجيات', debit: 2000, credit: 0, otherAdditions: 0 },
+  { id: '5', date: new Date('2023-12-15'), type: 'إيجار', quantity: 1, price: 1200, description: 'إيجار المكتب', debit: 0, credit: 1200, otherAdditions: 0 },
 ];
 
 export default function AccountingDashboard() {
@@ -72,14 +73,15 @@ export default function AccountingDashboard() {
       price: 0,
       amount: 0,
       description: "",
-      type: ""
+      type: "",
+      otherAdditions: 0,
     },
   });
 
    useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      if (name === "quantity" || name === "price") {
-        form.setValue("amount", (value.quantity || 0) * (value.price || 0));
+      if (name === "quantity" || name === "price" || name === "otherAdditions") {
+        form.setValue("amount", (value.quantity || 0) * (value.price || 0) + (value.otherAdditions || 0));
       }
     });
     return () => subscription.unsubscribe();
@@ -93,6 +95,7 @@ export default function AccountingDashboard() {
       quantity: values.quantity,
       price: values.price,
       description: values.description,
+      otherAdditions: values.otherAdditions || 0,
       debit: values.movement === 'debit' ? values.amount : 0,
       credit: values.movement === 'credit' ? values.amount : 0,
     };
@@ -139,7 +142,7 @@ export default function AccountingDashboard() {
   }, [filteredTransactions]);
 
   const handleExport = () => {
-    const headers = ["ID", "التاريخ", "النوع", "الكمية", "السعر", "الوصف", "مدين", "دائن"];
+    const headers = ["ID", "التاريخ", "النوع", "الكمية", "السعر", "إضافات أخرى", "الوصف", "مدين", "دائن"];
     
     const escapeCSV = (str: any) => {
       const string = String(str);
@@ -156,6 +159,7 @@ export default function AccountingDashboard() {
         escapeCSV(t.type),
         t.quantity,
         t.price,
+        t.otherAdditions || 0,
         escapeCSV(t.description),
         t.debit,
         t.credit
@@ -290,6 +294,19 @@ export default function AccountingDashboard() {
                   </div>
                    <FormField
                     control={form.control}
+                    name="otherAdditions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>إضافات أخرى</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="0" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                   <FormField
+                    control={form.control}
                     name="movement"
                     render={({ field }) => (
                       <FormItem className="space-y-3">
@@ -311,7 +328,7 @@ export default function AccountingDashboard() {
                       name="amount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>المبلغ الإجمالي</FormLabel>
+                          <FormLabel>اجمالي السعر</FormLabel>
                           <FormControl>
                             <Input type="number" {...field} readOnly className="font-bold bg-muted" />
                           </FormControl>
@@ -406,6 +423,9 @@ export default function AccountingDashboard() {
                         <TableRow>
                             <TableHead>الوصف</TableHead>
                             <TableHead>التاريخ</TableHead>
+                            <TableHead>الكمية</TableHead>
+                            <TableHead>السعر</TableHead>
+                            <TableHead>إضافات أخرى</TableHead>
                             <TableHead>مدين</TableHead>
                             <TableHead>دائن</TableHead>
                             <TableHead>الرصيد</TableHead>
@@ -425,6 +445,9 @@ export default function AccountingDashboard() {
                                     <div className="text-sm text-muted-foreground">{t.type}</div>
                                 </TableCell>
                                 <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                                <TableCell>{t.quantity}</TableCell>
+                                <TableCell>{t.price.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{(t.otherAdditions ?? 0).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-green-600">{t.debit > 0 ? t.debit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }) : '-'}</TableCell>
                                 <TableCell className="text-red-600">{t.credit > 0 ? t.credit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }) : '-'}</TableCell>
                                 <TableCell className="font-medium">{t.balance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
@@ -432,7 +455,7 @@ export default function AccountingDashboard() {
                             ))
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={5} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={8} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>
