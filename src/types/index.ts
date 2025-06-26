@@ -1,11 +1,14 @@
 export type Transaction = {
   id: string;
   date: Date;
-  type: string;
-  quantity: number;
-  price: number;
+  supplierName: string;
   description: string;
-  debit: number;
-  credit: number;
-  otherAdditions?: number;
+  quantity: number;
+  purchasePrice: number;
+  totalPurchasePrice: number;
+  sellingPrice: number;
+  totalSellingPrice: number;
+  taxes: number;
+  profit: number;
+  paidAmount: number;
 };

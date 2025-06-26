@@ -5,15 +5,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
-  ArrowDown,
-  ArrowUp,
-  CreditCard,
+  BookUser,
   DollarSign,
   Download,
   Plus,
   Search,
-  TrendingUp,
+  LineChart,
   Calendar as CalendarIcon,
+  ShoppingCart,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { format } from 'date-fns';
@@ -42,21 +41,22 @@ import { Textarea } from './ui/textarea';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
-  type: z.string().min(1, 'النوع مطلوب.'),
-  quantity: z.coerce.number().min(0, 'الكمية يجب أن تكون موجبة.'),
-  price: z.coerce.number().min(0, 'السعر يجب أن يكون موجبًا.'),
-  otherAdditions: z.coerce.number().optional(),
+  supplierName: z.string().min(1, 'اسم المورد مطلوب.'),
   description: z.string().min(1, 'الوصف مطلوب.'),
-  movement: z.enum(['debit', 'credit'], { required_error: 'يجب تحديد نوع الحركة.' }),
-  amount: z.coerce.number().min(0.01, 'المبلغ يجب أن يكون أكبر من صفر.'),
+  quantity: z.coerce.number().min(1, 'الكمية يجب أن تكون 1 على الأقل.'),
+  purchasePrice: z.coerce.number().min(0, 'سعر الشراء يجب أن يكون موجبًا.'),
+  sellingPrice: z.coerce.number().min(0, 'سعر البيع يجب أن يكون موجبًا.'),
+  taxes: z.coerce.number().min(0, 'الضرائب يجب أن تكون موجبة.').default(0),
+  paidAmount: z.coerce.number().min(0, 'المبلغ المدفوع يجب أن يكون موجبًا.').default(0),
+  totalPurchasePrice: z.coerce.number().optional(),
+  totalSellingPrice: z.coerce.number().optional(),
+  profit: z.coerce.number().optional(),
 });
 
 const initialTransactions: Transaction[] = [
-  { id: '1', date: new Date('2023-10-01'), type: 'مبيعات', quantity: 10, price: 150, description: 'بيع أجهزة إلكترونية', debit: 1500, credit: 0, otherAdditions: 0 },
-  { id: '2', date: new Date('2023-10-05'), type: 'مشتريات', quantity: 5, price: 80, description: 'شراء مواد خام', debit: 0, credit: 400, otherAdditions: 0 },
-  { id: '3', date: new Date('2023-11-12'), type: 'راتب', quantity: 1, price: 3000, description: 'راتب موظف', debit: 0, credit: 3000, otherAdditions: 0 },
-  { id: '4', date: new Date('2023-11-20'), type: 'مبيعات', quantity: 20, price: 100, description: 'بيع برمجيات', debit: 2000, credit: 0, otherAdditions: 0 },
-  { id: '5', date: new Date('2023-12-15'), type: 'إيجار', quantity: 1, price: 1200, description: 'إيجار المكتب', debit: 0, credit: 1200, otherAdditions: 0 },
+    { id: '1', date: new Date('2023-10-01'), supplierName: 'مورد ألف', description: 'مواد بناء', quantity: 10, purchasePrice: 150, totalPurchasePrice: 1500, sellingPrice: 200, totalSellingPrice: 2000, taxes: 50, profit: 450, paidAmount: 1000 },
+    { id: '2', date: new Date('2023-10-05'), supplierName: 'مورد باء', description: 'أدوات كهربائية', quantity: 5, purchasePrice: 80, totalPurchasePrice: 400, sellingPrice: 120, totalSellingPrice: 600, taxes: 20, profit: 180, paidAmount: 400 },
+    { id: '3', date: new Date('2023-11-12'), supplierName: 'مورد ألف', description: 'إسمنت', quantity: 20, purchasePrice: 50, totalPurchasePrice: 1000, sellingPrice: 65, totalSellingPrice: 1300, taxes: 30, profit: 270, paidAmount: 500 },
 ];
 
 export default function AccountingDashboard() {
@@ -70,36 +70,49 @@ export default function AccountingDashboard() {
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       quantity: 1,
-      price: 0,
-      amount: 0,
+      purchasePrice: 0,
+      sellingPrice: 0,
+      taxes: 0,
+      paidAmount: 0,
+      supplierName: "",
       description: "",
-      type: "",
-      otherAdditions: 0,
     },
   });
 
    useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === "quantity" || name === "price" || name === "otherAdditions") {
-        form.setValue("amount", (value.quantity || 0) * (value.price || 0) + (value.otherAdditions || 0));
-      }
+    const subscription = form.watch((values) => {
+        const { quantity = 0, purchasePrice = 0, sellingPrice = 0, taxes = 0 } = values;
+        const totalPurchasePrice = quantity * purchasePrice;
+        const totalSellingPrice = quantity * sellingPrice;
+        const profit = totalSellingPrice - totalPurchasePrice - taxes;
+        
+        form.setValue("totalPurchasePrice", totalPurchasePrice, { shouldValidate: true });
+        form.setValue("totalSellingPrice", totalSellingPrice, { shouldValidate: true });
+        form.setValue("profit", profit, { shouldValidate: true });
     });
     return () => subscription.unsubscribe();
   }, [form]);
 
   const onSubmit = (values: z.infer<typeof transactionSchema>) => {
+    const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
+    const totalSellingPrice = (values.quantity || 0) * (values.sellingPrice || 0);
+    const profit = totalSellingPrice - totalPurchasePrice - (values.taxes || 0);
+
     const newTransaction: Transaction = {
       id: new Date().toISOString(),
       date: values.date,
-      type: values.type,
-      quantity: values.quantity,
-      price: values.price,
+      supplierName: values.supplierName,
       description: values.description,
-      otherAdditions: values.otherAdditions || 0,
-      debit: values.movement === 'debit' ? values.amount : 0,
-      credit: values.movement === 'credit' ? values.amount : 0,
+      quantity: values.quantity,
+      purchasePrice: values.purchasePrice,
+      sellingPrice: values.sellingPrice,
+      taxes: values.taxes || 0,
+      paidAmount: values.paidAmount || 0,
+      totalPurchasePrice,
+      totalSellingPrice,
+      profit,
     };
-    setTransactions(prev => [newTransaction, ...prev]);
+    setTransactions(prev => [newTransaction, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
     toast({
       title: "نجاح",
       description: "تمت إضافة العملية بنجاح.",
@@ -113,28 +126,29 @@ export default function AccountingDashboard() {
     return transactions.filter(t => {
       const searchMatch =
         t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.type.toLowerCase().includes(searchTerm.toLowerCase());
+        t.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
       const dateMatch = dateFilter ? format(t.date, 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd') : true;
       return searchMatch && dateMatch;
     });
   }, [transactions, searchTerm, dateFilter]);
 
-  const { totalDebit, totalCredit, balance } = useMemo(() => {
-    const totalDebit = filteredTransactions.reduce((acc, t) => acc + t.debit, 0);
-    const totalCredit = filteredTransactions.reduce((acc, t) => acc + t.credit, 0);
-    const balance = totalDebit - totalCredit;
-    return { totalDebit, totalCredit, balance };
+  const { totalSales, totalPurchases, totalProfit } = useMemo(() => {
+    return filteredTransactions.reduce((acc, t) => {
+        acc.totalSales += t.totalSellingPrice;
+        acc.totalPurchases += t.totalPurchasePrice;
+        acc.totalProfit += t.profit;
+        return acc;
+    }, { totalSales: 0, totalPurchases: 0, totalProfit: 0 });
   }, [filteredTransactions]);
 
   const chartData = useMemo(() => {
-    const monthlyData: { [key: string]: { debit: number; credit: number } } = {};
+    const monthlyData: { [key: string]: { profit: number } } = {};
     filteredTransactions.forEach(t => {
       const month = format(t.date, 'MMM yyyy', { locale: ar });
       if (!monthlyData[month]) {
-        monthlyData[month] = { debit: 0, credit: 0 };
+        monthlyData[month] = { profit: 0 };
       }
-      monthlyData[month].debit += t.debit;
-      monthlyData[month].credit += t.credit;
+      monthlyData[month].profit += t.profit;
     });
     return Object.entries(monthlyData)
       .map(([name, values]) => ({ name, ...values }))
@@ -142,7 +156,7 @@ export default function AccountingDashboard() {
   }, [filteredTransactions]);
 
   const handleExport = () => {
-    const headers = ["ID", "التاريخ", "النوع", "الكمية", "السعر", "إضافات أخرى", "الوصف", "مدين", "دائن"];
+    const headers = ["مسلسل", "التاريخ", "اسم المورد", "الوصف", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المبلغ المدفوع"];
     
     const escapeCSV = (str: any) => {
       const string = String(str);
@@ -152,23 +166,24 @@ export default function AccountingDashboard() {
       return string;
     };
 
-    const rows = transactions.map(t =>
+    const rows = transactions.map((t, index) =>
       [
-        escapeCSV(t.id),
+        index + 1,
         format(t.date, 'yyyy-MM-dd'),
-        escapeCSV(t.type),
-        t.quantity,
-        t.price,
-        t.otherAdditions || 0,
+        escapeCSV(t.supplierName),
         escapeCSV(t.description),
-        t.debit,
-        t.credit
+        t.quantity,
+        t.purchasePrice,
+        t.totalPurchasePrice,
+        t.sellingPrice,
+        t.totalSellingPrice,
+        t.taxes,
+        t.profit,
+        t.paidAmount
       ].join(',')
     );
 
-    // Adding BOM for Excel to recognize UTF-8
     const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
-    
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     
@@ -186,7 +201,7 @@ export default function AccountingDashboard() {
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
-          <CreditCard className="w-8 h-8"/> دفتر حساباتي
+          <BookUser className="w-8 h-8"/> دفتر حسابات الموردين
         </h1>
         <div className="flex gap-2">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -195,40 +210,27 @@ export default function AccountingDashboard() {
                 <Plus className="ml-2 h-4 w-4" /> إضافة عملية
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] md:max-w-lg">
+            <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>إضافة عملية جديدة</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
-                   <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>وصف الحركة</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="مثال: بيع منتجات" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto pr-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="type"
+                      name="supplierName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>النوع</FormLabel>
+                          <FormLabel>اسم المورد</FormLabel>
                           <FormControl>
-                            <Input placeholder="مثال: مبيعات، مشتريات" {...field} />
+                            <Input placeholder="اسم المورد" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <FormField
+                     <FormField
                       control={form.control}
                       name="date"
                       render={({ field }) => (
@@ -239,10 +241,7 @@ export default function AccountingDashboard() {
                               <FormControl>
                                 <Button
                                   variant={"outline"}
-                                  className={cn(
-                                    "w-full justify-start text-right font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
+                                  className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
                                 >
                                   <CalendarIcon className="ml-2 h-4 w-4" />
                                   {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
@@ -250,13 +249,7 @@ export default function AccountingDashboard() {
                               </FormControl>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                initialFocus
-                              />
+                              <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus />
                             </PopoverContent>
                           </Popover>
                           <FormMessage />
@@ -264,7 +257,20 @@ export default function AccountingDashboard() {
                       )}
                     />
                   </div>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>الوصف / النوع</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="وصف المنتج أو الخدمة" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="quantity"
@@ -278,12 +284,40 @@ export default function AccountingDashboard() {
                         </FormItem>
                       )}
                     />
-                    <FormField
+                     <FormField
                       control={form.control}
-                      name="price"
+                      name="taxes"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>السعر</FormLabel>
+                          <FormLabel>الضرائب</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <FormField
+                      control={form.control}
+                      name="purchasePrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>سعر الشراء</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="sellingPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>سعر البيع</FormLabel>
                           <FormControl>
                             <Input type="number" {...field} />
                           </FormControl>
@@ -292,45 +326,52 @@ export default function AccountingDashboard() {
                       )}
                     />
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <FormField
+                        control={form.control}
+                        name="totalPurchasePrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>إجمالي سعر الشراء</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} readOnly className="font-bold bg-muted" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="totalSellingPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>إجمالي سعر البيع</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} readOnly className="font-bold bg-muted" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                  </div>
                    <FormField
-                    control={form.control}
-                    name="otherAdditions"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>إضافات أخرى</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="0" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                   <FormField
-                    control={form.control}
-                    name="movement"
-                    render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel>نوع الحركة</FormLabel>
-                          <div className="flex gap-4">
-                            <Button type="button" variant={field.value === 'debit' ? 'default' : 'outline'} onClick={() => field.onChange('debit')} className="flex-1">
-                                <ArrowUp className="ml-2 h-4 w-4"/> إيراد (مدين)
-                            </Button>
-                            <Button type="button" variant={field.value === 'credit' ? 'destructive' : 'outline'} onClick={() => field.onChange('credit')} className="flex-1">
-                               <ArrowDown className="ml-2 h-4 w-4" /> مصروف (دائن)
-                            </Button>
-                          </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
                       control={form.control}
-                      name="amount"
+                      name="profit"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>اجمالي السعر</FormLabel>
+                          <FormLabel>الربح</FormLabel>
                           <FormControl>
                             <Input type="number" {...field} readOnly className="font-bold bg-muted" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                   <FormField
+                      control={form.control}
+                      name="paidAmount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>المبلغ المدفوع للمورد</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -356,37 +397,37 @@ export default function AccountingDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي الإيرادات</CardTitle>
-            <ArrowUp className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm font-medium">إجمالي المشتريات</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalDebit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div>
+            <div className="text-2xl font-bold">{totalPurchases.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المصروفات</CardTitle>
-            <ArrowDown className="h-4 w-4 text-red-500" />
+            <CardTitle className="text-sm font-medium">إجمالي المبيعات</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCredit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div>
+            <div className="text-2xl font-bold">{totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div>
           </CardContent>
         </Card>
         <Card className="md:col-span-2 lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">الرصيد الحالي</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">صافي الربح</CardTitle>
+            <LineChart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {balance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+            <div className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {totalProfit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
           </CardContent>
         </Card>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
             <Card>
                 <CardHeader>
                     <CardTitle>سجل العمليات</CardTitle>
@@ -394,7 +435,7 @@ export default function AccountingDashboard() {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                            placeholder="بحث بالوصف أو النوع..."
+                            placeholder="بحث بالوصف أو اسم المورد..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10"
@@ -421,41 +462,55 @@ export default function AccountingDashboard() {
                     <Table>
                         <TableHeader>
                         <TableRow>
-                            <TableHead>الوصف</TableHead>
+                            <TableHead>م</TableHead>
                             <TableHead>التاريخ</TableHead>
-                            <TableHead>الكمية</TableHead>
-                            <TableHead>السعر</TableHead>
-                            <TableHead>إضافات أخرى</TableHead>
-                            <TableHead>مدين</TableHead>
-                            <TableHead>دائن</TableHead>
-                            <TableHead>الرصيد</TableHead>
+                            <TableHead>اسم المورد</TableHead>
+                            <TableHead>الوصف</TableHead>
+                            <TableHead>إجمالي الشراء</TableHead>
+                            <TableHead>إجمالي البيع</TableHead>
+                            <TableHead>الضرائب</TableHead>
+                            <TableHead>الربح</TableHead>
+                            <TableHead>المدفوع</TableHead>
+                            <TableHead>رصيد المورد</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
                         {filteredTransactions.length > 0 ? (
-                            filteredTransactions.reduce((acc, t, index) => {
-                            const prevBalance = index > 0 ? acc[index - 1].balance : 0;
-                            const currentBalance = prevBalance + t.debit - t.credit;
-                            acc.push({ ...t, balance: currentBalance });
-                            return acc;
-                            }, [] as (Transaction & { balance: number })[]).map((t) => (
-                                <TableRow key={t.id}>
-                                <TableCell>
-                                    <div className="font-medium">{t.description}</div>
-                                    <div className="text-sm text-muted-foreground">{t.type}</div>
-                                </TableCell>
-                                <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
-                                <TableCell>{t.quantity}</TableCell>
-                                <TableCell>{t.price.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell>{(t.otherAdditions ?? 0).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className="text-green-600">{t.debit > 0 ? t.debit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }) : '-'}</TableCell>
-                                <TableCell className="text-red-600">{t.credit > 0 ? t.credit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }) : '-'}</TableCell>
-                                <TableCell className="font-medium">{t.balance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                </TableRow>
-                            ))
+                            (() => {
+                                const supplierBalances: { [key: string]: number } = {};
+                                const transactionsWithBalance = [...filteredTransactions]
+                                  .sort((a,b) => a.date.getTime() - b.date.getTime())
+                                  .map(t => {
+                                    if (supplierBalances[t.supplierName] === undefined) {
+                                      supplierBalances[t.supplierName] = 0;
+                                    }
+                                    supplierBalances[t.supplierName] += t.totalPurchasePrice - t.paidAmount;
+                                    return { ...t, supplierBalance: supplierBalances[t.supplierName] };
+                                  });
+                                
+                                return transactionsWithBalance.reverse().map((t, index) => (
+                                    <TableRow key={t.id}>
+                                    <TableCell>{filteredTransactions.length - index}</TableCell>
+                                    <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                                    <TableCell>
+                                        <div className="font-medium">{t.supplierName}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="font-medium">{t.description}</div>
+                                        <div className="text-sm text-muted-foreground">الكمية: {t.quantity}</div>
+                                    </TableCell>
+                                    <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                    <TableCell>{t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                    <TableCell>{t.taxes.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                    <TableCell className={`font-medium ${t.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                    <TableCell className="text-blue-600">{t.paidAmount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                    <TableCell className={`font-bold ${t.supplierBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                    </TableRow>
+                                ));
+                            })()
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={8} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={10} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>
@@ -463,10 +518,11 @@ export default function AccountingDashboard() {
                 </CardContent>
             </Card>
         </div>
-        <div className="lg:col-span-1">
+      </div>
+      <div className="mt-8">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><TrendingUp/> الحركة المالية الشهرية</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><LineChart/> ملخص الربح الشهري</CardTitle>
                 </CardHeader>
                 <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -477,17 +533,15 @@ export default function AccountingDashboard() {
                         <Tooltip
                          formatter={(value, name) => [
                             (value as number).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }),
-                            name === 'debit' ? 'إيرادات' : 'مصروفات'
+                            'صافي الربح'
                          ]}
                          cursor={{fill: 'hsl(var(--muted))'}}
                         />
-                        <Bar dataKey="debit" fill="hsl(var(--primary))" name="إيرادات" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="credit" fill="hsl(var(--destructive))" name="مصروفات" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="profit" fill="hsl(var(--primary))" name="الربح" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
                 </CardContent>
             </Card>
-        </div>
       </div>
     </div>
   );
