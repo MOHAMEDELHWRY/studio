@@ -10,5 +10,6 @@ export type Transaction = {
   totalSellingPrice: number;
   taxes: number;
   profit: number;
-  paidAmount: number;
+  amountPaidToFactory: number;
+  amountReceivedFromSupplier: number;
 };

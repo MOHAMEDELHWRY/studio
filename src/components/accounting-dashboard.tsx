@@ -47,16 +47,17 @@ const transactionSchema = z.object({
   purchasePrice: z.coerce.number().min(0, 'سعر الشراء يجب أن يكون موجبًا.'),
   sellingPrice: z.coerce.number().min(0, 'سعر البيع يجب أن يكون موجبًا.'),
   taxes: z.coerce.number().min(0, 'الضرائب يجب أن تكون موجبة.').default(0),
-  paidAmount: z.coerce.number().min(0, 'المبلغ المدفوع يجب أن يكون موجبًا.').default(0),
+  amountPaidToFactory: z.coerce.number().min(0, 'المبلغ المدفوع يجب أن يكون موجبًا.').default(0),
+  amountReceivedFromSupplier: z.coerce.number().min(0, 'المبلغ المستلم يجب أن يكون موجبًا.').default(0),
   totalPurchasePrice: z.coerce.number().optional(),
   totalSellingPrice: z.coerce.number().optional(),
   profit: z.coerce.number().optional(),
 });
 
 const initialTransactions: Transaction[] = [
-    { id: '1', date: new Date('2023-10-01'), supplierName: 'مورد ألف', description: 'مواد بناء', quantity: 10, purchasePrice: 150, totalPurchasePrice: 1500, sellingPrice: 200, totalSellingPrice: 2000, taxes: 50, profit: 450, paidAmount: 1000 },
-    { id: '2', date: new Date('2023-10-05'), supplierName: 'مورد باء', description: 'أدوات كهربائية', quantity: 5, purchasePrice: 80, totalPurchasePrice: 400, sellingPrice: 120, totalSellingPrice: 600, taxes: 20, profit: 180, paidAmount: 400 },
-    { id: '3', date: new Date('2023-11-12'), supplierName: 'مورد ألف', description: 'إسمنت', quantity: 20, purchasePrice: 50, totalPurchasePrice: 1000, sellingPrice: 65, totalSellingPrice: 1300, taxes: 30, profit: 270, paidAmount: 500 },
+    { id: '1', date: new Date('2023-10-01'), supplierName: 'مورد ألف', description: 'مواد بناء', quantity: 10, purchasePrice: 150, totalPurchasePrice: 1500, sellingPrice: 200, totalSellingPrice: 2000, taxes: 50, profit: 450, amountPaidToFactory: 1000, amountReceivedFromSupplier: 0 },
+    { id: '2', date: new Date('2023-10-05'), supplierName: 'مورد باء', description: 'أدوات كهربائية', quantity: 5, purchasePrice: 80, totalPurchasePrice: 400, sellingPrice: 120, totalSellingPrice: 600, taxes: 20, profit: 180, amountPaidToFactory: 400, amountReceivedFromSupplier: 0 },
+    { id: '3', date: new Date('2023-11-12'), supplierName: 'مورد ألف', description: 'إسمنت', quantity: 20, purchasePrice: 50, totalPurchasePrice: 1000, sellingPrice: 65, totalSellingPrice: 1300, taxes: 30, profit: 270, amountPaidToFactory: 500, amountReceivedFromSupplier: 0 },
 ];
 
 export default function AccountingDashboard() {
@@ -74,7 +75,8 @@ export default function AccountingDashboard() {
       purchasePrice: 0,
       sellingPrice: 0,
       taxes: 0,
-      paidAmount: 0,
+      amountPaidToFactory: 0,
+      amountReceivedFromSupplier: 0,
       supplierName: "",
       description: "",
     },
@@ -104,7 +106,8 @@ export default function AccountingDashboard() {
       purchasePrice: values.purchasePrice,
       sellingPrice: values.sellingPrice,
       taxes: values.taxes || 0,
-      paidAmount: values.paidAmount || 0,
+      amountPaidToFactory: values.amountPaidToFactory || 0,
+      amountReceivedFromSupplier: values.amountReceivedFromSupplier || 0,
       totalPurchasePrice: values.totalPurchasePrice!,
       totalSellingPrice: values.totalSellingPrice!,
       profit: values.profit!,
@@ -152,7 +155,7 @@ export default function AccountingDashboard() {
   }, [filteredTransactions]);
 
   const handleExport = () => {
-    const headers = ["مسلسل", "التاريخ", "اسم المورد", "الوصف", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المبلغ المدفوع"];
+    const headers = ["مسلسل", "التاريخ", "اسم المورد", "الوصف", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المورد"];
     
     const escapeCSV = (str: any) => {
       const string = String(str);
@@ -175,7 +178,9 @@ export default function AccountingDashboard() {
         t.totalSellingPrice,
         t.taxes,
         t.profit,
-        t.paidAmount
+        t.amountPaidToFactory,
+        t.amountReceivedFromSupplier,
+        t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier
       ].join(',')
     );
 
@@ -360,19 +365,34 @@ export default function AccountingDashboard() {
                         </FormItem>
                       )}
                     />
-                   <FormField
-                      control={form.control}
-                      name="paidAmount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>المبلغ المدفوع للمورد</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <FormField
+                        control={form.control}
+                        name="amountPaidToFactory"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>المبلغ المدفوع للمصنع</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="0" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="amountReceivedFromSupplier"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>المبلغ المستلم من المورد</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="0" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                   </div>
 
                   <DialogFooter>
                     <Button type="submit">حفظ العملية</Button>
@@ -466,7 +486,8 @@ export default function AccountingDashboard() {
                             <TableHead>إجمالي البيع</TableHead>
                             <TableHead>الضرائب</TableHead>
                             <TableHead>الربح</TableHead>
-                            <TableHead>المدفوع</TableHead>
+                            <TableHead>المدفوع للمصنع</TableHead>
+                            <TableHead>المستلم من المورد</TableHead>
                             <TableHead>رصيد المورد</TableHead>
                         </TableRow>
                         </TableHeader>
@@ -480,7 +501,7 @@ export default function AccountingDashboard() {
                                     if (supplierBalances[t.supplierName] === undefined) {
                                       supplierBalances[t.supplierName] = 0;
                                     }
-                                    supplierBalances[t.supplierName] += t.totalPurchasePrice - t.paidAmount;
+                                    supplierBalances[t.supplierName] += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
                                     return { ...t, supplierBalance: supplierBalances[t.supplierName] };
                                   });
                                 
@@ -499,14 +520,15 @@ export default function AccountingDashboard() {
                                     <TableCell>{t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                     <TableCell>{t.taxes.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                     <TableCell className={`font-medium ${t.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                    <TableCell className="text-blue-600">{t.paidAmount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                    <TableCell className="text-blue-600">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                    <TableCell className="text-green-600">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                     <TableCell className={`font-bold ${t.supplierBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                     </TableRow>
                                 ));
                             })()
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={10} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={11} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>
