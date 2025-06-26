@@ -140,17 +140,41 @@ export default function AccountingDashboard() {
 
   const handleExport = () => {
     const headers = ["ID", "التاريخ", "النوع", "الكمية", "السعر", "الوصف", "مدين", "دائن"];
+    
+    const escapeCSV = (str: any) => {
+      const string = String(str);
+      if (string.search(/("|,|\n)/g) >= 0) {
+        return `"${string.replace(/"/g, '""')}"`;
+      }
+      return string;
+    };
+
     const rows = transactions.map(t =>
-      [t.id, format(t.date, 'yyyy-MM-dd'), t.type, t.quantity, t.price, t.description, t.debit, t.credit].join(',')
+      [
+        escapeCSV(t.id),
+        format(t.date, 'yyyy-MM-dd'),
+        escapeCSV(t.type),
+        t.quantity,
+        t.price,
+        escapeCSV(t.description),
+        t.debit,
+        t.credit
+      ].join(',')
     );
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
+
+    // Adding BOM for Excel to recognize UTF-8
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", "transactions.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
   
 
