@@ -1,3 +1,9 @@
+import AccountingDashboard from '@/components/accounting-dashboard';
+
 export default function Home() {
-  return <></>;
+  return (
+    <main>
+      <AccountingDashboard />
+    </main>
+  );
 }
