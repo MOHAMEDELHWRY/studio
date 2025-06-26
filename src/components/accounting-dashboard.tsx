@@ -69,6 +69,7 @@ export default function AccountingDashboard() {
   const form = useForm<z.infer<typeof transactionSchema>>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
+      date: new Date(),
       quantity: 1,
       purchasePrice: 0,
       sellingPrice: 0,
@@ -94,10 +95,6 @@ export default function AccountingDashboard() {
   }, [form]);
 
   const onSubmit = (values: z.infer<typeof transactionSchema>) => {
-    const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
-    const totalSellingPrice = (values.quantity || 0) * (values.sellingPrice || 0);
-    const profit = totalSellingPrice - totalPurchasePrice - (values.taxes || 0);
-
     const newTransaction: Transaction = {
       id: new Date().toISOString(),
       date: values.date,
@@ -108,15 +105,14 @@ export default function AccountingDashboard() {
       sellingPrice: values.sellingPrice,
       taxes: values.taxes || 0,
       paidAmount: values.paidAmount || 0,
-      totalPurchasePrice,
-      totalSellingPrice,
-      profit,
+      totalPurchasePrice: values.totalPurchasePrice!,
+      totalSellingPrice: values.totalSellingPrice!,
+      profit: values.profit!,
     };
     setTransactions(prev => [newTransaction, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
     toast({
       title: "نجاح",
       description: "تمت إضافة العملية بنجاح.",
-      className: "bg-green-500 text-white",
     });
     form.reset();
     setIsDialogOpen(false);
