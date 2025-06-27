@@ -378,6 +378,11 @@ export default function AccountingDashboard() {
                 <Factory className="ml-2 h-4 w-4" /> تقرير المصنع
               </Link>
           </Button>
+           <Button asChild variant="secondary">
+              <Link href="/reports">
+                <LineChart className="ml-2 h-4 w-4" /> تقارير المبيعات والأرباح
+              </Link>
+          </Button>
           <Dialog open={isDialogOpen} onOpenChange={onDialogOpenChange}>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
@@ -639,7 +644,7 @@ export default function AccountingDashboard() {
                       </FormItem>
                   </div>
                    <FormItem>
-                      <FormLabel>الربح</FormLabel>
+                      <FormLabel>صافي الربح</FormLabel>
                       <FormControl>
                         <Input type="number" value={profitDisplay} readOnly className="font-bold bg-muted" />
                       </FormControl>
