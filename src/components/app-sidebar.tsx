@@ -30,7 +30,7 @@ export function AppSidebar() {
     <Sidebar side="right">
       <SidebarHeader className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-sidebar-foreground p-2 group-data-[collapsible=icon]:hidden">
-          دفتر حساباتي
+          دفتر الموردين
         </h2>
          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpenMobile(false)}>
             <SidebarClose />
