@@ -215,45 +215,6 @@ export default function AccountingDashboard() {
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
   }, [transactions, searchTerm, dateFilter]);
   
-  const transactionsWithBalances = useMemo(() => {
-    const supplierGroups: { [key: string]: Transaction[] } = {};
-
-    // Group transactions by supplier
-    transactions.forEach(t => {
-      if (!supplierGroups[t.supplierName]) {
-        supplierGroups[t.supplierName] = [];
-      }
-      supplierGroups[t.supplierName].push(t);
-    });
-
-    const allTransactionsWithBalances: (Transaction & { supplierSalesBalance: number; supplierCashFlowBalance: number; })[] = [];
-
-    // Calculate running balances for each supplier
-    for (const supplierName in supplierGroups) {
-      const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
-      
-      let salesBalance = 0;
-      let cashFlowBalance = 0;
-
-      const transactionsForSupplier = sortedTransactions.map(t => {
-        salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-        cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
-        return {
-          ...t,
-          supplierSalesBalance: salesBalance,
-          supplierCashFlowBalance: cashFlowBalance,
-        };
-      });
-      allTransactionsWithBalances.push(...transactionsForSupplier);
-    }
-
-    // Filter and sort the combined list for display
-    return allTransactionsWithBalances
-      .filter(t => filteredAndSortedTransactions.some(ft => ft.id === t.id))
-      .sort((a, b) => b.date.getTime() - a.date.getTime());
-      
-  }, [transactions, filteredAndSortedTransactions]);
-
   const { totalSales, totalPurchases, totalProfit, totalSuppliersSalesBalance } = useMemo(() => {
     const stats = filteredAndSortedTransactions.reduce((acc, t) => {
         acc.totalSales += t.totalSellingPrice;
@@ -290,7 +251,7 @@ export default function AccountingDashboard() {
   }, [filteredAndSortedTransactions]);
 
   const handleExport = () => {
-    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المبيعات", "الرصيد النقدي"];
+    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد"];
     
     const escapeCSV = (str: any) => {
       if (str === null || str === undefined) return "";
@@ -301,9 +262,9 @@ export default function AccountingDashboard() {
       return string;
     };
 
-    const rows = transactionsWithBalances.map((t, index) =>
+    const rows = filteredAndSortedTransactions.map((t, index) =>
       [
-        transactionsWithBalances.length - index,
+        filteredAndSortedTransactions.length - index,
         format(t.date, 'yyyy-MM-dd'),
         format(t.executionDate, 'yyyy-MM-dd'),
         format(t.dueDate, 'yyyy-MM-dd'),
@@ -320,9 +281,7 @@ export default function AccountingDashboard() {
         t.taxes,
         t.profit,
         t.amountPaidToFactory,
-        t.amountReceivedFromSupplier,
-        t.supplierSalesBalance,
-        t.supplierCashFlowBalance
+        t.amountReceivedFromSupplier
       ].join(',')
     );
 
@@ -768,16 +727,14 @@ export default function AccountingDashboard() {
                             <TableHead>صافي الربح</TableHead>
                             <TableHead>المدفوع للمصنع</TableHead>
                             <TableHead>المستلم من المورد</TableHead>
-                            <TableHead>رصيد المبيعات</TableHead>
-                             <TableHead>الرصيد النقدي</TableHead>
                             <TableHead>الإجراءات</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {transactionsWithBalances.length > 0 ? (
-                            transactionsWithBalances.map((t, index) => (
+                        {filteredAndSortedTransactions.length > 0 ? (
+                            filteredAndSortedTransactions.map((t, index) => (
                                 <TableRow key={t.id}>
-                                <TableCell>{transactionsWithBalances.length - index}</TableCell>
+                                <TableCell>{filteredAndSortedTransactions.length - index}</TableCell>
                                 <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                                 <TableCell>
                                     <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
@@ -788,8 +745,6 @@ export default function AccountingDashboard() {
                                 <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className={`font-bold ${t.supplierSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.supplierSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className={`font-bold ${t.supplierCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.supplierCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell>
                                   <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
                                     <Pencil className="h-4 w-4" />
@@ -800,7 +755,7 @@ export default function AccountingDashboard() {
                             ))
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={12} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={10} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>
