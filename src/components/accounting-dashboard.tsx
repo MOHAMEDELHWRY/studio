@@ -55,7 +55,7 @@ const transactionSchema = z.object({
   dueDate: z.date({ required_error: 'تاريخ الاستحقاق مطلوب.' }),
   supplierName: z.string().min(1, 'اسم المورد مطلوب.'),
   governorate: z.string().min(1, 'المحافظة مطلوبة.'),
-  city: z.string().min(1, 'المركز مطلوب.'),
+  city: z.string(),
   description: z.string().min(1, 'الوصف مطلوب.'),
   type: z.string().min(1, 'النوع مطلوب.'),
   quantity: z.coerce.number().min(1, 'الكمية يجب أن تكون 1 على الأقل.'),
@@ -205,7 +205,7 @@ export default function AccountingDashboard() {
         t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.governorate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.city && t.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
         t.type.toLowerCase().includes(searchTerm.toLowerCase());
       const dateMatch = dateFilter ? format(t.date, 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd') : true;
       return searchMatch && dateMatch;
@@ -227,7 +227,7 @@ export default function AccountingDashboard() {
       const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
       let currentBalance = 0;
       for (const t of sortedTransactions) {
-        currentBalance += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+        currentBalance += t.amountReceivedFromSupplier + t.amountPaidToFactory - t.totalPurchasePrice;
         balances[t.id] = currentBalance;
       }
     }
@@ -256,7 +256,7 @@ export default function AccountingDashboard() {
         const supplierTotalBalance = transactions
             .filter(t => t.supplierName === supplierName)
             .reduce((balance, t) => {
-                return balance + t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+                return balance + t.amountReceivedFromSupplier + t.amountPaidToFactory - t.totalPurchasePrice;
             }, 0);
         return acc + supplierTotalBalance;
     }, 0);
@@ -667,7 +667,7 @@ export default function AccountingDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${totalSuppliersBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
+            <div className={`text-2xl font-bold ${totalSuppliersBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
               {totalSuppliersBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
           </CardContent>
@@ -772,7 +772,7 @@ export default function AccountingDashboard() {
                                 <TableCell className={`font-medium ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className={`font-bold ${t.supplierBalance >= 0 ? 'text-destructive' : 'text-success'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell className={`font-bold ${t.supplierBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell>
                                   <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
                                     <Pencil className="h-4 w-4" />
