@@ -9,6 +9,7 @@ import {
   BookUser,
   DollarSign,
   Download,
+  Pencil,
   Plus,
   Search,
   LineChart,
@@ -28,7 +29,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
@@ -69,10 +69,11 @@ const transactionSchema = z.object({
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
 export default function AccountingDashboard() {
-  const { transactions, addTransaction } = useTransactions();
+  const { transactions, addTransaction, updateTransaction } = useTransactions();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const { toast } = useToast();
 
@@ -110,27 +111,83 @@ export default function AccountingDashboard() {
   }, [selectedGovernorate, setValue]);
 
 
+  const handleOpenDialog = (transaction: Transaction | null) => {
+    setEditingTransaction(transaction);
+    if (transaction) {
+      form.reset({
+        ...transaction,
+        date: new Date(transaction.date),
+        executionDate: new Date(transaction.executionDate),
+        dueDate: new Date(transaction.dueDate),
+      });
+       if (transaction.governorate) {
+        setAvailableCities(cities[transaction.governorate] || []);
+      }
+    } else {
+      form.reset({
+        date: new Date(),
+        executionDate: new Date(),
+        dueDate: new Date(),
+        supplierName: "",
+        governorate: "",
+        city: "",
+        description: "",
+        type: "",
+        quantity: 1,
+        purchasePrice: 0,
+        sellingPrice: 0,
+        taxes: 0,
+        amountPaidToFactory: 0,
+        amountReceivedFromSupplier: 0,
+      });
+    }
+    setIsDialogOpen(true);
+  };
+
+  const onDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      setEditingTransaction(null);
+    }
+    setIsDialogOpen(open);
+  };
+
+
   const onSubmit = (values: TransactionFormValues) => {
     try {
         const totalPurchasePrice = values.quantity * values.purchasePrice;
         const totalSellingPrice = values.quantity * values.sellingPrice;
         const profit = totalSellingPrice - totalPurchasePrice - values.taxes;
 
-        const newTransaction: Transaction = {
-          id: new Date().toISOString(),
-          ...values,
-          totalPurchasePrice,
-          totalSellingPrice,
-          profit,
-        };
-        
-        addTransaction(newTransaction);
-        toast({
-          title: "نجاح",
-          description: "تمت إضافة العملية بنجاح.",
-          variant: "default"
-        });
-
+        if (editingTransaction) {
+            const updatedTransaction: Transaction = {
+              ...editingTransaction,
+              ...values,
+              totalPurchasePrice,
+              totalSellingPrice,
+              profit,
+            };
+            updateTransaction(updatedTransaction);
+            toast({
+              title: "نجاح",
+              description: "تم تعديل العملية بنجاح.",
+              variant: "default"
+            });
+        } else {
+            const newTransaction: Transaction = {
+              id: new Date().toISOString(),
+              ...values,
+              totalPurchasePrice,
+              totalSellingPrice,
+              profit,
+            };
+            
+            addTransaction(newTransaction);
+            toast({
+              title: "نجاح",
+              description: "تمت إضافة العملية بنجاح.",
+              variant: "default"
+            });
+        }
         form.reset();
         setIsDialogOpen(false);
     } catch (error) {
@@ -280,15 +337,13 @@ export default function AccountingDashboard() {
           <BookUser className="w-8 h-8"/> دفتر حسابات الموردين
         </h1>
         <div className="flex gap-2">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="ml-2 h-4 w-4" /> إضافة عملية
-              </Button>
-            </DialogTrigger>
+          <Button onClick={() => handleOpenDialog(null)}>
+            <Plus className="ml-2 h-4 w-4" /> إضافة عملية
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={onDialogOpenChange}>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>إضافة عملية جديدة</DialogTitle>
+                <DialogTitle>{editingTransaction ? 'تعديل عملية' : 'إضافة عملية جديدة'}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto pr-6">
@@ -692,6 +747,7 @@ export default function AccountingDashboard() {
                             <TableHead>المدفوع للمصنع</TableHead>
                             <TableHead>المستلم من المورد</TableHead>
                             <TableHead>رصيد المورد</TableHead>
+                            <TableHead>الإجراءات</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -717,11 +773,17 @@ export default function AccountingDashboard() {
                                 <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className={`font-bold ${t.supplierBalance >= 0 ? 'text-destructive' : 'text-success'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>
+                                  <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
+                                    <Pencil className="h-4 w-4" />
+                                    <span className="sr-only">تعديل</span>
+                                  </Button>
+                                </TableCell>
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={17} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={18} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>

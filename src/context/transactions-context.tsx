@@ -46,6 +46,7 @@ const saveTransactions = (transactions: Transaction[]) => {
 interface TransactionsContextType {
   transactions: Transaction[];
   addTransaction: (transaction: Transaction) => void;
+  updateTransaction: (updatedTransaction: Transaction) => void;
   deleteSupplier: (supplierName: string) => void;
 }
 
@@ -67,12 +68,19 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     setTransactions(prev => [transaction, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
   };
 
+  const updateTransaction = (updatedTransaction: Transaction) => {
+    setTransactions(prev => 
+      prev.map(t => (t.id === updatedTransaction.id ? updatedTransaction : t))
+         .sort((a, b) => b.date.getTime() - a.date.getTime())
+    );
+  };
+
   const deleteSupplier = (supplierName: string) => {
     setTransactions(prev => prev.filter(t => t.supplierName !== supplierName));
   };
 
   return (
-    <TransactionsContext.Provider value={{ transactions, addTransaction, deleteSupplier }}>
+    <TransactionsContext.Provider value={{ transactions, addTransaction, updateTransaction, deleteSupplier }}>
       {children}
     </TransactionsContext.Provider>
   );
