@@ -354,6 +354,11 @@ export default function AccountingDashboard() {
             <Plus className="ml-2 h-4 w-4" /> إضافة عملية
           </Button>
            <Button asChild variant="secondary">
+              <Link href="/suppliers-report">
+                <Users className="ml-2 h-4 w-4" /> تقرير الموردين
+              </Link>
+          </Button>
+           <Button asChild variant="secondary">
               <Link href="/factory-report">
                 <Factory className="ml-2 h-4 w-4" /> تقرير المصنع
               </Link>
