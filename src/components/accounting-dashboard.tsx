@@ -94,6 +94,11 @@ export default function AccountingDashboard() {
   }, [form]);
 
   const onSubmit = (values: z.infer<typeof transactionSchema>) => {
+    // Re-calculate derived values here to ensure they are correct upon submission
+    const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
+    const totalSellingPrice = (values.quantity || 0) * (values.sellingPrice || 0);
+    const profit = totalSellingPrice - totalPurchasePrice - (values.taxes || 0);
+
     const newTransaction: Transaction = {
       id: new Date().toISOString(),
       date: values.date,
@@ -105,16 +110,29 @@ export default function AccountingDashboard() {
       taxes: values.taxes || 0,
       amountPaidToFactory: values.amountPaidToFactory || 0,
       amountReceivedFromSupplier: values.amountReceivedFromSupplier || 0,
-      totalPurchasePrice: values.totalPurchasePrice!,
-      totalSellingPrice: values.totalSellingPrice!,
-      profit: values.profit!,
+      totalPurchasePrice: totalPurchasePrice,
+      totalSellingPrice: totalSellingPrice,
+      profit: profit,
     };
+    
     addTransaction(newTransaction);
     toast({
       title: "نجاح",
       description: "تمت إضافة العملية بنجاح.",
     });
-    form.reset();
+
+    // Reset the form with clean default values
+    form.reset({
+      date: new Date(),
+      supplierName: "",
+      description: "",
+      quantity: 1,
+      purchasePrice: 0,
+      sellingPrice: 0,
+      taxes: 0,
+      amountPaidToFactory: 0,
+      amountReceivedFromSupplier: 0,
+    });
     setIsDialogOpen(false);
   };
 
