@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import Link from 'next/link';
 import {
   BookUser,
   DollarSign,
@@ -38,6 +39,7 @@ import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from './ui/textarea';
+import { useTransactions } from '@/context/transactions-context';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -54,14 +56,9 @@ const transactionSchema = z.object({
   profit: z.coerce.number().optional(),
 });
 
-const initialTransactions: Transaction[] = [
-    { id: '1', date: new Date('2023-10-01'), supplierName: 'مورد ألف', description: 'مواد بناء', quantity: 10, purchasePrice: 150, totalPurchasePrice: 1500, sellingPrice: 200, totalSellingPrice: 2000, taxes: 50, profit: 450, amountPaidToFactory: 1000, amountReceivedFromSupplier: 0 },
-    { id: '2', date: new Date('2023-10-05'), supplierName: 'مورد باء', description: 'أدوات كهربائية', quantity: 5, purchasePrice: 80, totalPurchasePrice: 400, sellingPrice: 120, totalSellingPrice: 600, taxes: 20, profit: 180, amountPaidToFactory: 400, amountReceivedFromSupplier: 0 },
-    { id: '3', date: new Date('2023-11-12'), supplierName: 'مورد ألف', description: 'إسمنت', quantity: 20, purchasePrice: 50, totalPurchasePrice: 1000, sellingPrice: 65, totalSellingPrice: 1300, taxes: 30, profit: 270, amountPaidToFactory: 500, amountReceivedFromSupplier: 0 },
-];
 
 export default function AccountingDashboard() {
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const { transactions, addTransaction } = useTransactions();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -112,7 +109,7 @@ export default function AccountingDashboard() {
       totalSellingPrice: values.totalSellingPrice!,
       profit: values.profit!,
     };
-    setTransactions(prev => [newTransaction, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
+    addTransaction(newTransaction);
     toast({
       title: "نجاح",
       description: "تمت إضافة العملية بنجاح.",
@@ -495,22 +492,33 @@ export default function AccountingDashboard() {
                         {filteredTransactions.length > 0 ? (
                             (() => {
                                 const supplierBalances: { [key: string]: number } = {};
-                                const transactionsWithBalance = [...filteredTransactions]
-                                  .sort((a,b) => a.date.getTime() - b.date.getTime())
-                                  .map(t => {
+                                const allTransactionsSorted = [...transactions].sort((a,b) => a.date.getTime() - b.date.getTime());
+
+                                allTransactionsSorted.forEach(t => {
                                     if (supplierBalances[t.supplierName] === undefined) {
                                       supplierBalances[t.supplierName] = 0;
                                     }
                                     supplierBalances[t.supplierName] += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
-                                    return { ...t, supplierBalance: supplierBalances[t.supplierName] };
+                                });
+                                
+                                const transactionsWithBalance = filteredTransactions.map(t => {
+                                    const allSupplierTransactions = transactions
+                                        .filter(item => item.supplierName === t.supplierName && item.date <= t.date)
+                                        .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+                                    const balance = allSupplierTransactions.reduce((acc, current) => {
+                                        return acc + current.totalPurchasePrice - current.amountPaidToFactory - current.amountReceivedFromSupplier;
+                                    }, 0);
+                                    
+                                    return { ...t, supplierBalance: balance };
                                   });
                                 
-                                return transactionsWithBalance.reverse().map((t, index) => (
+                                return transactionsWithBalance.map((t, index) => (
                                     <TableRow key={t.id}>
                                     <TableCell>{filteredTransactions.length - index}</TableCell>
                                     <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                                     <TableCell>
-                                        <div className="font-medium">{t.supplierName}</div>
+                                        <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
                                     </TableCell>
                                     <TableCell>
                                         <div className="font-medium">{t.description}</div>
