@@ -67,7 +67,7 @@ import {
 import { SidebarTrigger } from './ui/sidebar';
 import { Skeleton } from './ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
-import { analyzePerformance } from '@/ai/flows/analyze-performance-flow';
+import { analyzePerformance, type PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -105,7 +105,7 @@ export default function AccountingDashboard() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const { toast } = useToast();
-  const [analysis, setAnalysis] = useState<string>('');
+  const [analysis, setAnalysis] = useState<PerformanceAnalysisOutput>('');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
   // States for controlling date picker popovers
@@ -546,7 +546,7 @@ export default function AccountingDashboard() {
                                       </Button>
                                     </FormControl>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
+                                  <PopoverContent className="w-auto p-0" align="center">
                                     <Calendar 
                                       mode="single" 
                                       selected={field.value} 
@@ -777,7 +777,7 @@ export default function AccountingDashboard() {
                                       </Button>
                                     </FormControl>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
+                                  <PopoverContent className="w-auto p-0" align="center">
                                     <Calendar
                                       mode="single"
                                       selected={field.value}
@@ -811,7 +811,7 @@ export default function AccountingDashboard() {
                                       </Button>
                                     </FormControl>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
+                                  <PopoverContent className="w-auto p-0" align="center">
                                     <Calendar
                                       mode="single"
                                       selected={field.value}
@@ -866,7 +866,7 @@ export default function AccountingDashboard() {
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
+                          <PopoverContent className="w-auto p-0" align="center">
                             <Calendar
                               mode="single"
                               selected={field.value}
@@ -987,7 +987,7 @@ export default function AccountingDashboard() {
                               {dateFilter ? format(dateFilter, "PPP", { locale: ar }) : <span>فلترة بالتاريخ</span>}
                               </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
+                          <PopoverContent className="w-auto p-0" align="center">
                               <Calendar
                                 mode="single"
                                 selected={dateFilter}
