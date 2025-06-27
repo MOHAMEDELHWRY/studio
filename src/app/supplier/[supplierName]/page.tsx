@@ -45,7 +45,7 @@ export default function SupplierReportPage() {
   const transactionsWithBalance = useMemo(() => {
     let balance = 0;
     return supplierTransactionsAsc.map(t => {
-      balance += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+      balance += t.totalPurchasePrice + t.amountReceivedFromSupplier - t.amountPaidToFactory;
       return { ...t, runningBalance: balance };
     }).sort((a, b) => b.date.getTime() - a.date.getTime()); // Newest first for display
   }, [supplierTransactionsAsc]);
