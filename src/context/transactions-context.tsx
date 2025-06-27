@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { type Transaction } from '@/types';
+import { type Transaction, type Expense } from '@/types';
 
 // Function to load transactions from localStorage
 const loadTransactions = (): Transaction[] => {
@@ -42,26 +42,70 @@ const saveTransactions = (transactions: Transaction[]) => {
   }
 };
 
+// Function to load expenses from localStorage
+const loadExpenses = (): Expense[] => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  try {
+    const serializedState = localStorage.getItem('expenses');
+    if (serializedState === null) {
+      return [];
+    }
+    const storedExpenses = JSON.parse(serializedState);
+    return storedExpenses.map((e: any) => ({
+      ...e,
+      date: new Date(e.date),
+    }));
+  } catch (error) {
+    console.error("Could not load expenses from localStorage", error);
+    return [];
+  }
+};
+
+// Function to save expenses to localStorage
+const saveExpenses = (expenses: Expense[]) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    const serializedState = JSON.stringify(expenses);
+    localStorage.setItem('expenses', serializedState);
+  } catch (error) {
+    console.error("Could not save expenses to localStorage", error);
+  }
+};
+
 
 interface TransactionsContextType {
   transactions: Transaction[];
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (updatedTransaction: Transaction) => void;
   deleteSupplier: (supplierName: string) => void;
+  expenses: Expense[];
+  addExpense: (expense: Expense) => void;
+  updateExpense: (updatedExpense: Expense) => void;
+  deleteExpense: (expenseId: string) => void;
 }
 
 const TransactionsContext = createContext<TransactionsContextType | undefined>(undefined);
 
 export function TransactionsProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
   useEffect(() => {
     setTransactions(loadTransactions());
+    setExpenses(loadExpenses());
   }, []);
 
   useEffect(() => {
     saveTransactions(transactions);
   }, [transactions]);
+  
+  useEffect(() => {
+    saveExpenses(expenses);
+  }, [expenses]);
 
 
   const addTransaction = (transaction: Transaction) => {
@@ -78,9 +122,24 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const deleteSupplier = (supplierName: string) => {
     setTransactions(prev => prev.filter(t => t.supplierName !== supplierName));
   };
+  
+  const addExpense = (expense: Expense) => {
+    setExpenses(prev => [expense, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
+  };
+
+  const updateExpense = (updatedExpense: Expense) => {
+    setExpenses(prev => 
+      prev.map(t => (t.id === updatedExpense.id ? updatedExpense : t))
+         .sort((a, b) => b.date.getTime() - a.date.getTime())
+    );
+  };
+
+  const deleteExpense = (expenseId: string) => {
+    setExpenses(prev => prev.filter(e => e.id !== expenseId));
+  };
 
   return (
-    <TransactionsContext.Provider value={{ transactions, addTransaction, updateTransaction, deleteSupplier }}>
+    <TransactionsContext.Provider value={{ transactions, addTransaction, updateTransaction, deleteSupplier, expenses, addExpense, updateExpense, deleteExpense }}>
       {children}
     </TransactionsContext.Provider>
   );

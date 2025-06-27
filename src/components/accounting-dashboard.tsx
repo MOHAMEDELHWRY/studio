@@ -17,12 +17,15 @@ import {
   ShoppingCart,
   Users,
   Factory,
+  MinusCircle,
+  Wallet,
+  Trash2,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
-import { type Transaction } from '@/types';
+import { type Transaction, type Expense } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -49,6 +52,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { governorates, cities } from '@/data/egypt-governorates';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -69,12 +83,21 @@ const transactionSchema = z.object({
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
+const expenseSchema = z.object({
+  date: z.date({ required_error: "التاريخ مطلوب." }),
+  description: z.string().trim().min(1, "الوصف مطلوب."),
+  amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
+});
+type ExpenseFormValues = z.infer<typeof expenseSchema>;
+
 export default function AccountingDashboard() {
-  const { transactions, addTransaction, updateTransaction } = useTransactions();
+  const { transactions, addTransaction, updateTransaction, expenses, addExpense, updateExpense, deleteExpense } = useTransactions();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const { toast } = useToast();
 
@@ -95,6 +118,15 @@ export default function AccountingDashboard() {
       taxes: 0,
       amountPaidToFactory: 0,
       amountReceivedFromSupplier: 0,
+    },
+  });
+  
+  const expenseForm = useForm<ExpenseFormValues>({
+    resolver: zodResolver(expenseSchema),
+    defaultValues: {
+      date: new Date(),
+      description: "",
+      amount: 0,
     },
   });
 
@@ -143,6 +175,30 @@ export default function AccountingDashboard() {
       });
     }
     setIsDialogOpen(true);
+  };
+  
+  const handleOpenExpenseDialog = (expense: Expense | null) => {
+    setEditingExpense(expense);
+    if (expense) {
+      expenseForm.reset({
+        ...expense,
+        date: new Date(expense.date),
+      });
+    } else {
+      expenseForm.reset({
+        date: new Date(),
+        description: "",
+        amount: 0,
+      });
+    }
+    setIsExpenseDialogOpen(true);
+  };
+  
+  const onExpenseDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      setEditingExpense(null);
+    }
+    setIsExpenseDialogOpen(open);
   };
 
   const onDialogOpenChange = (open: boolean) => {
@@ -201,6 +257,27 @@ export default function AccountingDashboard() {
         });
     }
   };
+  
+  const onSubmitExpense = (values: ExpenseFormValues) => {
+    if (editingExpense) {
+      updateExpense({ ...editingExpense, ...values });
+      toast({ title: "نجاح", description: "تم تعديل المصروف بنجاح." });
+    } else {
+      addExpense({ ...values, id: new Date().toISOString() });
+      toast({ title: "نجاح", description: "تمت إضافة المصروف بنجاح." });
+    }
+    expenseForm.reset();
+    setIsExpenseDialogOpen(false);
+  };
+
+  const handleDeleteExpense = (expenseId: string) => {
+    deleteExpense(expenseId);
+    toast({
+      title: "تم الحذف",
+      description: "تم حذف المصروف بنجاح.",
+      variant: "default",
+    });
+  };
 
   const filteredAndSortedTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -215,13 +292,13 @@ export default function AccountingDashboard() {
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
   }, [transactions, searchTerm, dateFilter]);
   
-  const { totalSales, totalPurchases, totalProfit, totalSuppliersSalesBalance } = useMemo(() => {
+  const { totalSales, totalPurchases, profitFromTransactions, totalSuppliersSalesBalance } = useMemo(() => {
     const stats = transactions.reduce((acc, t) => {
         acc.totalSales += t.totalSellingPrice;
         acc.totalPurchases += t.totalPurchasePrice;
-        acc.totalProfit += t.profit;
+        acc.profitFromTransactions += t.profit;
         return acc;
-    }, { totalSales: 0, totalPurchases: 0, totalProfit: 0 });
+    }, { totalSales: 0, totalPurchases: 0, profitFromTransactions: 0 });
 
     const supplierBalances: { [key: string]: number } = {};
     transactions.forEach(t => {
@@ -235,6 +312,9 @@ export default function AccountingDashboard() {
 
     return { ...stats, totalSuppliersSalesBalance: balance };
   }, [transactions]);
+  
+  const totalExpenses = useMemo(() => expenses.reduce((acc, e) => acc + e.amount, 0), [expenses]);
+  const totalProfit = profitFromTransactions - totalExpenses;
 
   const chartData = useMemo(() => {
     const monthlyData: { [key: string]: { profit: number } } = {};
@@ -311,6 +391,9 @@ export default function AccountingDashboard() {
         <div className="flex gap-2 flex-wrap justify-center">
           <Button onClick={() => handleOpenDialog(null)}>
             <Plus className="ml-2 h-4 w-4" /> إضافة عملية
+          </Button>
+           <Button variant="outline" onClick={() => handleOpenExpenseDialog(null)}>
+            <MinusCircle className="ml-2 h-4 w-4" /> إضافة مصروف
           </Button>
            <Button asChild variant="secondary">
               <Link href="/suppliers-report">
@@ -632,6 +715,71 @@ export default function AccountingDashboard() {
               </Form>
             </DialogContent>
           </Dialog>
+           <Dialog open={isExpenseDialogOpen} onOpenChange={onExpenseDialogOpenChange}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingExpense ? 'تعديل مصروف' : 'إضافة مصروف جديد'}</DialogTitle>
+              </DialogHeader>
+              <Form {...expenseForm}>
+                <form onSubmit={expenseForm.handleSubmit(onSubmitExpense)} className="grid gap-4 py-4">
+                  <FormField
+                    control={expenseForm.control}
+                    name="date"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>تاريخ المصروف</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
+                              >
+                                <CalendarIcon className="ml-2 h-4 w-4" />
+                                {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={expenseForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>الوصف</FormLabel>
+                        <FormControl><Input placeholder="مثال: سحب أرباح" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={expenseForm.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>المبلغ</FormLabel>
+                        <FormControl><Input type="number" placeholder="0" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button type="submit">حفظ المصروف</Button>
+                     <DialogClose asChild>
+                      <Button type="button" variant="secondary">إلغاء</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
            <Button variant="outline" onClick={handleExport}>
             <Download className="ml-2 h-4 w-4" /> تصدير CSV
           </Button>
@@ -671,128 +819,190 @@ export default function AccountingDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">صافي الربح</CardTitle>
+            <CardTitle className="text-sm font-medium">صافي الربح (بعد المصروفات)</CardTitle>
             <LineChart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {totalProfit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
+             <p className="text-xs text-muted-foreground">
+              الربح {profitFromTransactions.toLocaleString('ar-EG', {style:'currency', currency: 'EGP'})} - المصروفات {totalExpenses.toLocaleString('ar-EG', {style:'currency', currency: 'EGP'})}
+            </p>
           </CardContent>
         </Card>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-3">
-            <Card>
-                <CardHeader>
-                    <CardTitle>سجل العمليات</CardTitle>
-                    <div className="flex flex-col md:flex-row gap-2 mt-4">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                            placeholder="بحث بالوصف أو اسم المورد..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
-                            />
-                        </div>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                variant={"outline"}
-                                className={cn("w-full md:w-[240px] justify-start text-right font-normal", !dateFilter && "text-muted-foreground")}
-                                >
-                                <CalendarIcon className="ml-2 h-4 w-4" />
-                                {dateFilter ? format(dateFilter, "PPP", { locale: ar }) : <span>فلترة بالتاريخ</span>}
+      <div className="lg:col-span-3 mb-8">
+          <Card>
+              <CardHeader>
+                  <CardTitle>سجل العمليات</CardTitle>
+                  <div className="flex flex-col md:flex-row gap-2 mt-4">
+                      <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                          placeholder="بحث بالوصف أو اسم المورد..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                          />
+                      </div>
+                      <Popover>
+                          <PopoverTrigger asChild>
+                              <Button
+                              variant={"outline"}
+                              className={cn("w-full md:w-[240px] justify-start text-right font-normal", !dateFilter && "text-muted-foreground")}
+                              >
+                              <CalendarIcon className="ml-2 h-4 w-4" />
+                              {dateFilter ? format(dateFilter, "PPP", { locale: ar }) : <span>فلترة بالتاريخ</span>}
+                              </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar mode="single" selected={dateFilter} onSelect={setDateFilter} initialFocus />
+                          </PopoverContent>
+                      </Popover>
+                       {dateFilter && <Button variant="ghost" onClick={() => setDateFilter(undefined)}>مسح الفلتر</Button>}
+                  </div>
+              </CardHeader>
+              <CardContent>
+                  <Table>
+                      <TableHeader>
+                      <TableRow>
+                          <TableHead>م</TableHead>
+                          <TableHead>التاريخ</TableHead>
+                          <TableHead>اسم المورد</TableHead>
+                          <TableHead>الوصف</TableHead>
+                          <TableHead>إجمالي الشراء</TableHead>
+                          <TableHead>إجمالي البيع</TableHead>
+                          <TableHead>صافي الربح</TableHead>
+                          <TableHead>المدفوع للمصنع</TableHead>
+                          <TableHead>المستلم من المورد</TableHead>
+                          <TableHead>الإجراءات</TableHead>
+                      </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                      {filteredAndSortedTransactions.length > 0 ? (
+                          filteredAndSortedTransactions.map((t, index) => (
+                              <TableRow key={t.id}>
+                              <TableCell>{filteredAndSortedTransactions.length - index}</TableCell>
+                              <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                              <TableCell>
+                                  <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
+                              </TableCell>
+                              <TableCell>{t.description}</TableCell>
+                              <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                              <TableCell>
+                                {t.totalSellingPrice > 0 ? (
+                                  t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })
+                                ) : (
+                                  <span className="text-muted-foreground">لم يتم البيع</span>
+                                )}
+                              </TableCell>
+                              <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                              <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                              <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                              <TableCell>
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
+                                  <Pencil className="h-4 w-4" />
+                                  <span className="sr-only">تعديل</span>
                                 </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={dateFilter} onSelect={setDateFilter} initialFocus />
-                            </PopoverContent>
-                        </Popover>
-                         {dateFilter && <Button variant="ghost" onClick={() => setDateFilter(undefined)}>مسح الفلتر</Button>}
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                        <TableRow>
-                            <TableHead>م</TableHead>
-                            <TableHead>التاريخ</TableHead>
-                            <TableHead>اسم المورد</TableHead>
-                            <TableHead>الوصف</TableHead>
-                            <TableHead>إجمالي الشراء</TableHead>
-                            <TableHead>إجمالي البيع</TableHead>
-                            <TableHead>صافي الربح</TableHead>
-                            <TableHead>المدفوع للمصنع</TableHead>
-                            <TableHead>المستلم من المورد</TableHead>
-                            <TableHead>الإجراءات</TableHead>
-                        </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                        {filteredAndSortedTransactions.length > 0 ? (
-                            filteredAndSortedTransactions.map((t, index) => (
-                                <TableRow key={t.id}>
-                                <TableCell>{filteredAndSortedTransactions.length - index}</TableCell>
-                                <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
-                                <TableCell>
-                                    <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
-                                </TableCell>
-                                <TableCell>{t.description}</TableCell>
-                                <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell>
-                                  {t.totalSellingPrice > 0 ? (
-                                    t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })
-                                  ) : (
-                                    <span className="text-muted-foreground">لم يتم البيع</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell>
-                                  <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
-                                    <Pencil className="h-4 w-4" />
-                                    <span className="sr-only">تعديل</span>
-                                  </Button>
-                                </TableCell>
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                            <TableCell colSpan={10} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
-                            </TableRow>
-                        )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-        </div>
+                              </TableCell>
+                              </TableRow>
+                          ))
+                      ) : (
+                          <TableRow>
+                          <TableCell colSpan={10} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                          </TableRow>
+                      )}
+                      </TableBody>
+                  </Table>
+              </CardContent>
+          </Card>
       </div>
-      <div className="mt-8">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><LineChart/> ملخص الربح الشهري</CardTitle>
-                </CardHeader>
-                <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} interval={0} />
-                        <YAxis width={80} tickFormatter={(value) => new Intl.NumberFormat('ar-EG', { notation: 'compact' }).format(value as number)} />
-                        <Tooltip
-                         formatter={(value, name) => [
-                            (value as number).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }),
-                            'صافي الربح'
-                         ]}
-                         cursor={{fill: 'hsl(var(--muted))'}}
-                        />
-                        <Bar dataKey="profit" fill="hsl(var(--primary))" name="الربح" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
-                </CardContent>
-            </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          <Card>
+              <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><LineChart/> ملخص الربح الشهري</CardTitle>
+              </CardHeader>
+              <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} interval={0} />
+                      <YAxis width={80} tickFormatter={(value) => new Intl.NumberFormat('ar-EG', { notation: 'compact' }).format(value as number)} />
+                      <Tooltip
+                       formatter={(value, name) => [
+                          (value as number).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }),
+                          'صافي الربح'
+                       ]}
+                       cursor={{fill: 'hsl(var(--muted))'}}
+                      />
+                      <Bar dataKey="profit" fill="hsl(var(--primary))" name="الربح" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+              </ResponsiveContainer>
+              </CardContent>
+          </Card>
+        </div>
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Wallet/> سجل المصروفات</CardTitle>
+            </CardHeader>
+            <CardContent>
+               <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>التاريخ</TableHead>
+                    <TableHead>الوصف</TableHead>
+                    <TableHead>المبلغ</TableHead>
+                    <TableHead>إجراء</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {expenses.length > 0 ? (
+                    expenses.map(e => (
+                      <TableRow key={e.id}>
+                        <TableCell>{format(e.date, 'dd-MM-yy')}</TableCell>
+                        <TableCell>{e.description}</TableCell>
+                        <TableCell className="text-destructive">{e.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                        <TableCell className="flex items-center">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenExpenseDialog(e)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  هذا الإجراء سيحذف المصروف بشكل دائم ولا يمكن التراجع عنه.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteExpense(e.id)}>متابعة</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center">لا توجد مصروفات.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
