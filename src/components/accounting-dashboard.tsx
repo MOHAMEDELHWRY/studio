@@ -63,6 +63,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { SidebarTrigger } from './ui/sidebar';
 import { Skeleton } from './ui/skeleton';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -454,296 +455,304 @@ export default function AccountingDashboard() {
                 <DialogTitle>{editingTransaction ? 'تعديل عملية' : 'إضافة عملية جديدة'}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto pr-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="supplierName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>اسم المورد</FormLabel>
-                          <FormControl>
-                            <Input placeholder="اسم المورد" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name="date"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>تاريخ العملية</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 max-h-[80vh] overflow-y-auto pr-6 pl-2">
+                  <Accordion type="multiple" defaultValue={['item-1']} className="w-full">
+                    <AccordionItem value="item-1">
+                      <AccordionTrigger>المعلومات الأساسية</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                          <FormField
+                            control={form.control}
+                            name="supplierName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>اسم المورد</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="اسم المورد" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="date"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
+                                <FormLabel>تاريخ العملية</FormLabel>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant={"outline"}
+                                        className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
+                                      >
+                                        <CalendarIcon className="ml-2 h-4 w-4" />
+                                        {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus />
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                              control={form.control}
+                              name="governorate"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>المحافظة</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="اختر المحافظة" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {governorates.map(gov => <SelectItem key={gov} value={gov}>{gov}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="city"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>المركز (اختياري)</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value} disabled={availableCities.length === 0}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="اختر المركز" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {availableCities.map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-2">
+                      <AccordionTrigger>تفاصيل البضاعة والتسعير</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                          <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>الوصف</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="اختر الوصف" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="معبأ">معبأ</SelectItem>
+                                    <SelectItem value="سائب">سائب</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="type"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>النوع</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="اختر النوع" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="22.5">22.5</SelectItem>
+                                    <SelectItem value="32.5">32.5</SelectItem>
+                                    <SelectItem value="42.5">42.5</SelectItem>
+                                    <SelectItem value="52.5">52.5</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="quantity"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>الكمية</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                           <FormField
+                            control={form.control}
+                            name="taxes"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>الضرائب</FormLabel>
+                                <FormControl>
+                                  <Input type="number" placeholder="0" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="purchasePrice"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>سعر الشراء</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="sellingPrice"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>سعر البيع</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                           <FormItem>
+                              <FormLabel>إجمالي سعر الشراء</FormLabel>
                               <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
-                                >
-                                  <CalendarIcon className="ml-2 h-4 w-4" />
-                                  {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
-                                </Button>
+                                <Input type="number" value={totalPurchasePriceDisplay} readOnly className="font-bold bg-muted" />
                               </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <FormField
-                        control={form.control}
-                        name="governorate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>المحافظة</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            </FormItem>
+                            <FormItem>
+                              <FormLabel>إجمالي سعر البيع</FormLabel>
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="اختر المحافظة" />
-                                </SelectTrigger>
+                                <Input type="number" value={totalSellingPriceDisplay} readOnly className="font-bold bg-muted" />
                               </FormControl>
-                              <SelectContent>
-                                {governorates.map(gov => <SelectItem key={gov} value={gov}>{gov}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="city"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>المركز (اختياري)</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={availableCities.length === 0}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="اختر المركز" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {availableCities.map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>الوصف</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            </FormItem>
+                        </div>
+                        <FormItem className="mt-4">
+                            <FormLabel>صافي الربح</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="اختر الوصف" />
-                              </SelectTrigger>
+                              <Input type="number" value={profitDisplay} readOnly className="font-bold bg-muted" />
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="معبأ">معبأ</SelectItem>
-                              <SelectItem value="سائب">سائب</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>النوع</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="اختر النوع" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="22.5">22.5</SelectItem>
-                              <SelectItem value="32.5">32.5</SelectItem>
-                              <SelectItem value="42.5">42.5</SelectItem>
-                              <SelectItem value="52.5">52.5</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="quantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>الكمية</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name="taxes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>الضرائب</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <FormField
-                      control={form.control}
-                      name="executionDate"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>تاريخ التنفيذ</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
-                                >
-                                  <CalendarIcon className="ml-2 h-4 w-4" />
-                                  {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name="purchasePrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>سعر الشراء</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <FormField
-                      control={form.control}
-                      name="dueDate"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>تاريخ الاستحقاق</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
-                                >
-                                  <CalendarIcon className="ml-2 h-4 w-4" />
-                                  {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="sellingPrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>سعر البيع</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <FormItem>
-                        <FormLabel>إجمالي سعر الشراء</FormLabel>
-                        <FormControl>
-                          <Input type="number" value={totalPurchasePriceDisplay} readOnly className="font-bold bg-muted" />
-                        </FormControl>
-                      </FormItem>
-                      <FormItem>
-                        <FormLabel>إجمالي سعر البيع</FormLabel>
-                        <FormControl>
-                          <Input type="number" value={totalSellingPriceDisplay} readOnly className="font-bold bg-muted" />
-                        </FormControl>
-                      </FormItem>
-                  </div>
-                   <FormItem>
-                      <FormLabel>صافي الربح</FormLabel>
-                      <FormControl>
-                        <Input type="number" value={profitDisplay} readOnly className="font-bold bg-muted" />
-                      </FormControl>
-                    </FormItem>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <FormField
-                        control={form.control}
-                        name="amountPaidToFactory"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>المبلغ المدفوع للمصنع</FormLabel>
-                            <FormControl>
-                              <Input type="number" placeholder="0" {...field} />
-                            </FormControl>
-                            <FormMessage />
                           </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="amountReceivedFromSupplier"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>المبلغ المستلم من المورد</FormLabel>
-                            <FormControl>
-                              <Input type="number" placeholder="0" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                   </div>
-
-                  <DialogFooter>
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-3">
+                      <AccordionTrigger>المدفوعات والتواريخ الهامة</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                          <FormField
+                              control={form.control}
+                              name="amountPaidToFactory"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>المبلغ المدفوع للمصنع</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="0" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="amountReceivedFromSupplier"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>المبلغ المستلم من المورد</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" placeholder="0" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          <FormField
+                            control={form.control}
+                            name="executionDate"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
+                                <FormLabel>تاريخ التنفيذ</FormLabel>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant={"outline"}
+                                        className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
+                                      >
+                                        <CalendarIcon className="ml-2 h-4 w-4" />
+                                        {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="dueDate"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-col">
+                                <FormLabel>تاريخ الاستحقاق</FormLabel>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant={"outline"}
+                                        className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
+                                      >
+                                        <CalendarIcon className="ml-2 h-4 w-4" />
+                                        {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                  </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                  <DialogFooter className="pt-4">
                     <Button type="submit">حفظ العملية</Button>
                     <DialogClose asChild>
                       <Button type="button" variant="secondary">إلغاء</Button>
