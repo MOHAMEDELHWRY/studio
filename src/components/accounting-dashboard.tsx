@@ -54,7 +54,7 @@ const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
   executionDate: z.date({ required_error: 'تاريخ التنفيذ مطلوب.' }),
   dueDate: z.date({ required_error: 'تاريخ الاستحقاق مطلوب.' }),
-  supplierName: z.string().min(1, 'اسم المورد مطلوب.'),
+  supplierName: z.string().trim().min(1, 'اسم المورد مطلوب.'),
   governorate: z.string().min(1, 'المحافظة مطلوبة.'),
   city: z.string().optional(),
   description: z.string().min(1, 'الوصف مطلوب.'),
@@ -215,10 +215,10 @@ export default function AccountingDashboard() {
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
   }, [transactions, searchTerm, dateFilter]);
   
-  const supplierSalesBalances = useMemo(() => {
-    const balances: { [transactionId: string]: number } = {};
-    const supplierGroups: { [supplierName: string]: Transaction[] } = {};
+  const transactionsWithBalances = useMemo(() => {
+    const supplierGroups: { [key: string]: Transaction[] } = {};
 
+    // Group transactions by supplier
     transactions.forEach(t => {
       if (!supplierGroups[t.supplierName]) {
         supplierGroups[t.supplierName] = [];
@@ -226,47 +226,33 @@ export default function AccountingDashboard() {
       supplierGroups[t.supplierName].push(t);
     });
 
+    const allTransactionsWithBalances: (Transaction & { supplierSalesBalance: number; supplierCashFlowBalance: number; })[] = [];
+
+    // Calculate running balances for each supplier
     for (const supplierName in supplierGroups) {
       const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
-      let currentBalance = 0;
-      for (const t of sortedTransactions) {
-        currentBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-        balances[t.id] = currentBalance;
-      }
+      
+      let salesBalance = 0;
+      let cashFlowBalance = 0;
+
+      const transactionsForSupplier = sortedTransactions.map(t => {
+        salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
+        cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
+        return {
+          ...t,
+          supplierSalesBalance: salesBalance,
+          supplierCashFlowBalance: cashFlowBalance,
+        };
+      });
+      allTransactionsWithBalances.push(...transactionsForSupplier);
     }
-    return balances;
-  }, [transactions]);
-  
-  const supplierCashFlowBalances = useMemo(() => {
-    const balances: { [transactionId: string]: number } = {};
-    const supplierGroups: { [supplierName: string]: Transaction[] } = {};
 
-    transactions.forEach(t => {
-      if (!supplierGroups[t.supplierName]) {
-        supplierGroups[t.supplierName] = [];
-      }
-      supplierGroups[t.supplierName].push(t);
-    });
-
-    for (const supplierName in supplierGroups) {
-      const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
-      let currentBalance = 0;
-      for (const t of sortedTransactions) {
-        currentBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
-        balances[t.id] = currentBalance;
-      }
-    }
-    return balances;
-  }, [transactions]);
-  
-  const transactionsForDisplay = useMemo(() => {
-    return filteredAndSortedTransactions.map(t => ({
-      ...t,
-      supplierSalesBalance: supplierSalesBalances[t.id] ?? 0,
-      supplierCashFlowBalance: supplierCashFlowBalances[t.id] ?? 0,
-    }));
-  }, [filteredAndSortedTransactions, supplierSalesBalances, supplierCashFlowBalances]);
-
+    // Filter and sort the combined list for display
+    return allTransactionsWithBalances
+      .filter(t => filteredAndSortedTransactions.some(ft => ft.id === t.id))
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+      
+  }, [transactions, filteredAndSortedTransactions]);
 
   const { totalSales, totalPurchases, totalProfit, totalSuppliersSalesBalance } = useMemo(() => {
     const stats = filteredAndSortedTransactions.reduce((acc, t) => {
@@ -276,21 +262,15 @@ export default function AccountingDashboard() {
         return acc;
     }, { totalSales: 0, totalPurchases: 0, totalProfit: 0 });
 
-    const suppliersInFilter = [...new Set(filteredAndSortedTransactions.map(t => t.supplierName))];
+    const supplierBalances: { [key: string]: number } = {};
+    transactions.forEach(t => {
+        if (!supplierBalances[t.supplierName]) {
+            supplierBalances[t.supplierName] = 0;
+        }
+        supplierBalances[t.supplierName] += t.amountReceivedFromSupplier - t.totalSellingPrice;
+    });
     
-    const balance = suppliersInFilter.reduce((acc, supplierName) => {
-        const supplierTransactions = transactions
-            .filter(t => t.supplierName === supplierName);
-            
-        if (supplierTransactions.length === 0) return acc;
-
-        const finalBalanceForSupplier = supplierTransactions.reduce((bal, t) => {
-             return bal + (t.amountReceivedFromSupplier - t.totalSellingPrice);
-        }, 0);
-        
-        return acc + finalBalanceForSupplier;
-
-    }, 0);
+    const balance = Object.values(supplierBalances).reduce((acc, cur) => acc + cur, 0);
 
     return { ...stats, totalSuppliersSalesBalance: balance };
   }, [filteredAndSortedTransactions, transactions]);
@@ -321,9 +301,9 @@ export default function AccountingDashboard() {
       return string;
     };
 
-    const rows = transactionsForDisplay.map((t, index) =>
+    const rows = transactionsWithBalances.map((t, index) =>
       [
-        transactionsForDisplay.length - index,
+        transactionsWithBalances.length - index,
         format(t.date, 'yyyy-MM-dd'),
         format(t.executionDate, 'yyyy-MM-dd'),
         format(t.dueDate, 'yyyy-MM-dd'),
@@ -789,10 +769,10 @@ export default function AccountingDashboard() {
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {transactionsForDisplay.length > 0 ? (
-                            transactionsForDisplay.map((t, index) => (
+                        {transactionsWithBalances.length > 0 ? (
+                            transactionsWithBalances.map((t, index) => (
                                 <TableRow key={t.id}>
-                                <TableCell>{transactionsForDisplay.length - index}</TableCell>
+                                <TableCell>{transactionsWithBalances.length - index}</TableCell>
                                 <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                                 <TableCell>
                                     <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
