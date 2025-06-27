@@ -51,11 +51,9 @@ const transactionSchema = z.object({
   taxes: z.coerce.number().min(0, 'الضرائب يجب أن تكون موجبة.').default(0),
   amountPaidToFactory: z.coerce.number().min(0, 'المبلغ المدفوع يجب أن يكون موجبًا.').default(0),
   amountReceivedFromSupplier: z.coerce.number().min(0, 'المبلغ المستلم يجب أن يكون موجبًا.').default(0),
-  totalPurchasePrice: z.coerce.number().optional(),
-  totalSellingPrice: z.coerce.number().optional(),
-  profit: z.coerce.number().optional(),
 });
 
+type TransactionFormValues = z.infer<typeof transactionSchema>;
 
 export default function AccountingDashboard() {
   const { transactions, addTransaction } = useTransactions();
@@ -64,74 +62,54 @@ export default function AccountingDashboard() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof transactionSchema>>({
+  const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       date: new Date(),
+      supplierName: "",
+      description: "",
       quantity: 1,
       purchasePrice: 0,
       sellingPrice: 0,
       taxes: 0,
       amountPaidToFactory: 0,
       amountReceivedFromSupplier: 0,
-      supplierName: "",
-      description: "",
     },
   });
 
-   useEffect(() => {
-    const subscription = form.watch((values) => {
-        const { quantity = 0, purchasePrice = 0, sellingPrice = 0, taxes = 0 } = values;
-        const totalPurchasePrice = quantity * purchasePrice;
-        const totalSellingPrice = quantity * sellingPrice;
-        const profit = totalSellingPrice - totalPurchasePrice - taxes;
-        
-        form.setValue("totalPurchasePrice", totalPurchasePrice);
-        form.setValue("totalSellingPrice", totalSellingPrice);
-        form.setValue("profit", profit);
-    });
-    return () => subscription.unsubscribe();
-  }, [form]);
+  const { watch, setValue } = form;
+  const watchedValues = watch();
 
-  const onSubmit = (values: z.infer<typeof transactionSchema>) => {
+  useEffect(() => {
+    const { quantity = 0, purchasePrice = 0, sellingPrice = 0 } = watchedValues;
+    const totalPurchasePrice = quantity * purchasePrice;
+    const totalSellingPrice = quantity * sellingPrice;
+    // These are for display only, not part of the form state for submission
+  }, [watchedValues]);
+
+
+  const onSubmit = (values: TransactionFormValues) => {
     try {
-        const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
-        const totalSellingPrice = (values.quantity || 0) * (values.sellingPrice || 0);
-        const profit = totalSellingPrice - totalPurchasePrice - (values.taxes || 0);
+        const totalPurchasePrice = values.quantity * values.purchasePrice;
+        const totalSellingPrice = values.quantity * values.sellingPrice;
+        const profit = totalSellingPrice - totalPurchasePrice - values.taxes;
 
         const newTransaction: Transaction = {
           id: new Date().toISOString(),
-          date: values.date,
-          supplierName: values.supplierName,
-          description: values.description,
-          quantity: values.quantity,
-          purchasePrice: values.purchasePrice,
-          sellingPrice: values.sellingPrice,
-          taxes: values.taxes || 0,
-          amountPaidToFactory: values.amountPaidToFactory || 0,
-          amountReceivedFromSupplier: values.amountReceivedFromSupplier || 0,
-          totalPurchasePrice: totalPurchasePrice,
-          totalSellingPrice: totalSellingPrice,
-          profit: profit,
+          ...values,
+          totalPurchasePrice,
+          totalSellingPrice,
+          profit,
         };
         
         addTransaction(newTransaction);
         toast({
           title: "نجاح",
           description: "تمت إضافة العملية بنجاح.",
+          variant: "default"
         });
 
-        form.reset({
-          date: new Date(),
-          supplierName: "",
-          description: "",
-          quantity: 1,
-          purchasePrice: 0,
-          sellingPrice: 0,
-          taxes: 0,
-          amountPaidToFactory: 0,
-          amountReceivedFromSupplier: 0,
-        });
+        form.reset();
         setIsDialogOpen(false);
     } catch (error) {
         toast({
@@ -151,27 +129,37 @@ export default function AccountingDashboard() {
       return searchMatch && dateMatch;
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
   }, [transactions, searchTerm, dateFilter]);
+  
+  const transactionBalances = useMemo(() => {
+    const balances: { [transactionId: string]: number } = {};
+    const supplierGroups: { [supplierName: string]: Transaction[] } = {};
 
-  const supplierBalances = useMemo(() => {
-    const balances: { [key: string]: number } = {};
-    const sortedTransactions = [...transactions].sort((a, b) => a.date.getTime() - b.date.getTime());
-    
-    const supplierFinalBalances: { [key: string]: number } = {};
+    // Group transactions by supplier
+    transactions.forEach(t => {
+      if (!supplierGroups[t.supplierName]) {
+        supplierGroups[t.supplierName] = [];
+      }
+      supplierGroups[t.supplierName].push(t);
+    });
 
-    for (const t of sortedTransactions) {
-      const balanceChange = t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
-      balances[t.supplierName] = (balances[t.supplierName] || 0) + balanceChange;
-      supplierFinalBalances[t.id] = balances[t.supplierName];
+    // Calculate running balance for each supplier
+    for (const supplierName in supplierGroups) {
+      const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
+      let currentBalance = 0;
+      for (const t of sortedTransactions) {
+        currentBalance += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+        balances[t.id] = currentBalance;
+      }
     }
-    return supplierFinalBalances;
+    return balances;
   }, [transactions]);
   
   const transactionsForDisplay = useMemo(() => {
     return filteredAndSortedTransactions.map(t => ({
       ...t,
-      supplierBalance: supplierBalances[t.id] || 0
+      supplierBalance: transactionBalances[t.id] ?? 0
     }));
-  }, [filteredAndSortedTransactions, supplierBalances]);
+  }, [filteredAndSortedTransactions, transactionBalances]);
 
 
   const { totalSales, totalPurchases, totalProfit } = useMemo(() => {
@@ -239,8 +227,11 @@ export default function AccountingDashboard() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-  
 
+  const totalPurchasePriceDisplay = (watchedValues.quantity || 0) * (watchedValues.purchasePrice || 0);
+  const totalSellingPriceDisplay = (watchedValues.quantity || 0) * (watchedValues.sellingPrice || 0);
+  const profitDisplay = totalSellingPriceDisplay - totalPurchasePriceDisplay - (watchedValues.taxes || 0);
+  
   return (
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
@@ -371,43 +362,25 @@ export default function AccountingDashboard() {
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <FormField
-                        control={form.control}
-                        name="totalPurchasePrice"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>إجمالي سعر الشراء</FormLabel>
-                            <FormControl>
-                              <Input type="number" {...field} readOnly className="font-bold bg-muted" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="totalSellingPrice"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>إجمالي سعر البيع</FormLabel>
-                            <FormControl>
-                              <Input type="number" {...field} readOnly className="font-bold bg-muted" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
+                     <FormItem>
+                        <FormLabel>إجمالي سعر الشراء</FormLabel>
+                        <FormControl>
+                          <Input type="number" value={totalPurchasePriceDisplay} readOnly className="font-bold bg-muted" />
+                        </FormControl>
+                      </FormItem>
+                      <FormItem>
+                        <FormLabel>إجمالي سعر البيع</FormLabel>
+                        <FormControl>
+                          <Input type="number" value={totalSellingPriceDisplay} readOnly className="font-bold bg-muted" />
+                        </FormControl>
+                      </FormItem>
                   </div>
-                   <FormField
-                      control={form.control}
-                      name="profit"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>الربح</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} readOnly className="font-bold bg-muted" />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                   <FormItem>
+                      <FormLabel>الربح</FormLabel>
+                      <FormControl>
+                        <Input type="number" value={profitDisplay} readOnly className="font-bold bg-muted" />
+                      </FormControl>
+                    </FormItem>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <FormField
                         control={form.control}
@@ -594,3 +567,5 @@ export default function AccountingDashboard() {
     </div>
   );
 }
+
+    
