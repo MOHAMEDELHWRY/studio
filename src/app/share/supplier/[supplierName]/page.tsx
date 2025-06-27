@@ -137,7 +137,13 @@ export default function ShareableSupplierReport() {
                         <td className="p-2 border whitespace-nowrap">{format(t.date, 'dd-MM-yyyy', { locale: ar })}</td>
                         <td className="p-2 border font-medium">{t.description}</td>
                         <td className="p-2 border whitespace-nowrap">{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
-                        <td className="p-2 border whitespace-nowrap">{t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
+                        <td className="p-2 border whitespace-nowrap">
+                          {t.totalSellingPrice > 0 ? (
+                            t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })
+                          ) : (
+                            <span className="text-gray-500">لم يتم البيع</span>
+                          )}
+                        </td>
                         <td className="p-2 border whitespace-nowrap text-blue-600">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
                         <td className="p-2 border whitespace-nowrap text-green-600">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
                         <td className={'p-2 border whitespace-nowrap font-bold ' + (t.salesRunningBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{t.salesRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
