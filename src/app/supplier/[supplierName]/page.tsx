@@ -20,23 +20,31 @@ export default function SupplierReportPage() {
     return typeof name === 'string' ? decodeURIComponent(name) : '';
   }, [params.supplierName]);
 
-  const supplierTransactions = useMemo(() => {
+  const supplierTransactionsAsc = useMemo(() => {
     if (!supplierName) return [];
     return transactions
       .filter(t => t.supplierName === supplierName)
-      .sort((a, b) => b.date.getTime() - a.date.getTime());
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [transactions, supplierName]);
+  
+  const transactionsWithBalance = useMemo(() => {
+    let balance = 0;
+    return supplierTransactionsAsc.map(t => {
+      balance += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+      return { ...t, runningBalance: balance };
+    }).reverse(); // Newest first for display
+  }, [supplierTransactionsAsc]);
 
   const supplierStats = useMemo(() => {
-    return supplierTransactions.reduce((acc, t) => {
+    return supplierTransactionsAsc.reduce((acc, t) => {
       acc.totalPurchases += t.totalPurchasePrice;
       acc.totalPaid += t.amountPaidToFactory;
       acc.totalReceived += t.amountReceivedFromSupplier;
       return acc;
     }, { totalPurchases: 0, totalPaid: 0, totalReceived: 0 });
-  }, [supplierTransactions]);
+  }, [supplierTransactionsAsc]);
 
-  const supplierBalance = supplierStats.totalPurchases - supplierStats.totalPaid - supplierStats.totalReceived;
+  const finalBalance = transactionsWithBalance.length > 0 ? transactionsWithBalance[0].runningBalance : 0;
 
   if (!supplierName) {
     return (
@@ -53,7 +61,7 @@ export default function SupplierReportPage() {
         <h1 className="text-3xl font-bold text-primary">تقرير المورد: {supplierName}</h1>
         <Button asChild variant="outline">
           <Link href="/">
-             العودة للوحة التحكم <ArrowRight className="mr-2 h-4 w-4" />
+             <ArrowRight className="ml-2 h-4 w-4" /> العودة للوحة التحكم
           </Link>
         </Button>
       </header>
@@ -76,7 +84,7 @@ export default function SupplierReportPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-primary">
               {supplierStats.totalPaid.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
           </CardContent>
@@ -87,7 +95,7 @@ export default function SupplierReportPage() {
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-success">
               {supplierStats.totalReceived.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
           </CardContent>
@@ -98,8 +106,8 @@ export default function SupplierReportPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${supplierBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-              {supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+            <div className={`text-2xl font-bold ${finalBalance > 0 ? 'text-destructive' : 'text-success'}`}>
+              {finalBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
           </CardContent>
         </Card>
@@ -119,23 +127,25 @@ export default function SupplierReportPage() {
                 <TableHead>إجمالي الشراء</TableHead>
                 <TableHead>المدفوع للمصنع</TableHead>
                 <TableHead>المستلم من المورد</TableHead>
+                <TableHead>رصيد المورد</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {supplierTransactions.length > 0 ? (
-                supplierTransactions.map(t => (
+              {transactionsWithBalance.length > 0 ? (
+                transactionsWithBalance.map(t => (
                   <TableRow key={t.id}>
                     <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                     <TableCell className="font-medium">{t.description}</TableCell>
                     <TableCell>{t.quantity}</TableCell>
                     <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                    <TableCell className="text-blue-600">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                    <TableCell className="text-green-600">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                    <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                    <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                    <TableCell className={`font-bold ${t.runningBalance > 0 ? 'text-destructive' : 'text-success'}`}>{t.runningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                     لا توجد عمليات لهذا المورد.
                   </TableCell>
                 </TableRow>
