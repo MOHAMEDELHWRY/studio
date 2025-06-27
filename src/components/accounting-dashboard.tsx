@@ -108,6 +108,13 @@ export default function AccountingDashboard() {
   const [analysis, setAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
+  // States for controlling date picker popovers
+  const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+  const [isExecDatePopoverOpen, setIsExecDatePopoverOpen] = useState(false);
+  const [isDueDatePopoverOpen, setIsDueDatePopoverOpen] = useState(false);
+  const [isExpenseDatePopoverOpen, setIsExpenseDatePopoverOpen] = useState(false);
+  const [isFilterDatePopoverOpen, setIsFilterDatePopoverOpen] = useState(false);
+
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
@@ -527,7 +534,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ العملية</FormLabel>
-                                <Popover>
+                                <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -540,7 +547,16 @@ export default function AccountingDashboard() {
                                     </FormControl>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus />
+                                    <Calendar 
+                                      mode="single" 
+                                      selected={field.value} 
+                                      onSelect={(date) => {
+                                        field.onChange(date);
+                                        setIsDatePopoverOpen(false);
+                                      }}
+                                      disabled={(date) => date > new Date()} 
+                                      initialFocus 
+                                    />
                                   </PopoverContent>
                                 </Popover>
                                 <FormMessage />
@@ -749,7 +765,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ التنفيذ</FormLabel>
-                                <Popover>
+                                <Popover open={isExecDatePopoverOpen} onOpenChange={setIsExecDatePopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -762,7 +778,15 @@ export default function AccountingDashboard() {
                                     </FormControl>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                    <Calendar
+                                      mode="single"
+                                      selected={field.value}
+                                      onSelect={(date) => {
+                                        field.onChange(date);
+                                        setIsExecDatePopoverOpen(false);
+                                      }}
+                                      initialFocus
+                                    />
                                   </PopoverContent>
                                 </Popover>
                                 <FormMessage />
@@ -775,7 +799,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ الاستحقاق</FormLabel>
-                                <Popover>
+                                <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -788,7 +812,15 @@ export default function AccountingDashboard() {
                                     </FormControl>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                    <Calendar
+                                      mode="single"
+                                      selected={field.value}
+                                      onSelect={(date) => {
+                                        field.onChange(date);
+                                        setIsDueDatePopoverOpen(false);
+                                      }}
+                                      initialFocus
+                                    />
                                   </PopoverContent>
                                 </Popover>
                                 <FormMessage />
@@ -822,7 +854,7 @@ export default function AccountingDashboard() {
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>تاريخ المصروف</FormLabel>
-                        <Popover>
+                        <Popover open={isExpenseDatePopoverOpen} onOpenChange={setIsExpenseDatePopoverOpen}>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
@@ -835,7 +867,16 @@ export default function AccountingDashboard() {
                             </FormControl>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date()} initialFocus />
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={(date) => {
+                                field.onChange(date);
+                                setIsExpenseDatePopoverOpen(false);
+                              }}
+                              disabled={(date) => date > new Date()}
+                              initialFocus
+                            />
                           </PopoverContent>
                         </Popover>
                         <FormMessage />
@@ -936,7 +977,7 @@ export default function AccountingDashboard() {
                           className="pl-10"
                           />
                       </div>
-                      <Popover>
+                      <Popover open={isFilterDatePopoverOpen} onOpenChange={setIsFilterDatePopoverOpen}>
                           <PopoverTrigger asChild>
                               <Button
                               variant={"outline"}
@@ -947,7 +988,15 @@ export default function AccountingDashboard() {
                               </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={dateFilter} onSelect={setDateFilter} initialFocus />
+                              <Calendar
+                                mode="single"
+                                selected={dateFilter}
+                                onSelect={(date) => {
+                                  setDateFilter(date);
+                                  setIsFilterDatePopoverOpen(false);
+                                }}
+                                initialFocus
+                              />
                           </PopoverContent>
                       </Popover>
                        {dateFilter && <Button variant="ghost" onClick={() => setDateFilter(undefined)}>مسح الفلتر</Button>}
