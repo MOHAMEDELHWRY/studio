@@ -44,6 +44,8 @@ import { useTransactions } from '@/context/transactions-context';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
+  executionDate: z.date({ required_error: 'تاريخ التنفيذ مطلوب.' }),
+  dueDate: z.date({ required_error: 'تاريخ الاستحقاق مطلوب.' }),
   supplierName: z.string().min(1, 'اسم المورد مطلوب.'),
   description: z.string().min(1, 'الوصف مطلوب.'),
   quantity: z.coerce.number().min(1, 'الكمية يجب أن تكون 1 على الأقل.'),
@@ -67,6 +69,8 @@ export default function AccountingDashboard() {
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       date: new Date(),
+      executionDate: new Date(),
+      dueDate: new Date(),
       supplierName: "",
       description: "",
       quantity: 1,
@@ -83,8 +87,6 @@ export default function AccountingDashboard() {
 
   useEffect(() => {
     const { quantity = 0, purchasePrice = 0, sellingPrice = 0 } = watchedValues;
-    const totalPurchasePrice = quantity * purchasePrice;
-    const totalSellingPrice = quantity * sellingPrice;
     // These are for display only, not part of the form state for submission
   }, [watchedValues]);
 
@@ -200,7 +202,7 @@ export default function AccountingDashboard() {
   }, [filteredAndSortedTransactions]);
 
   const handleExport = () => {
-    const headers = ["مسلسل", "التاريخ", "اسم المورد", "الوصف", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المورد"];
+    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "الوصف", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المورد"];
     
     const escapeCSV = (str: any) => {
       const string = String(str);
@@ -214,6 +216,8 @@ export default function AccountingDashboard() {
       [
         index + 1,
         format(t.date, 'yyyy-MM-dd'),
+        format(t.executionDate, 'yyyy-MM-dd'),
+        format(t.dueDate, 'yyyy-MM-dd'),
         escapeCSV(t.supplierName),
         escapeCSV(t.description),
         t.quantity,
@@ -284,7 +288,7 @@ export default function AccountingDashboard() {
                       name="date"
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <FormLabel>التاريخ</FormLabel>
+                          <FormLabel>تاريخ العملية</FormLabel>
                           <Popover>
                             <PopoverTrigger asChild>
                               <FormControl>
@@ -347,7 +351,33 @@ export default function AccountingDashboard() {
                       )}
                     />
                   </div>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <FormField
+                      control={form.control}
+                      name="executionDate"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>تاريخ التنفيذ</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
+                                >
+                                  <CalendarIcon className="ml-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                      <FormField
                       control={form.control}
                       name="purchasePrice"
@@ -357,6 +387,34 @@ export default function AccountingDashboard() {
                           <FormControl>
                             <Input type="number" {...field} />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <FormField
+                      control={form.control}
+                      name="dueDate"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>تاريخ الاستحقاق</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
+                                >
+                                  <CalendarIcon className="ml-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -523,6 +581,8 @@ export default function AccountingDashboard() {
                             <TableHead>التاريخ</TableHead>
                             <TableHead>اسم المورد</TableHead>
                             <TableHead>الوصف</TableHead>
+                            <TableHead>تاريخ التنفيذ</TableHead>
+                            <TableHead>تاريخ الاستحقاق</TableHead>
                             <TableHead>إجمالي الشراء</TableHead>
                             <TableHead>إجمالي البيع</TableHead>
                             <TableHead>الضرائب</TableHead>
@@ -545,6 +605,8 @@ export default function AccountingDashboard() {
                                     <div className="font-medium">{t.description}</div>
                                     <div className="text-sm text-muted-foreground">الكمية: {t.quantity}</div>
                                 </TableCell>
+                                <TableCell>{format(t.executionDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                                <TableCell>{format(t.dueDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                                 <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell>{t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell>{t.taxes.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
@@ -556,7 +618,7 @@ export default function AccountingDashboard() {
                             ))
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={11} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={13} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>

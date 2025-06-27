@@ -1,6 +1,8 @@
 export type Transaction = {
   id: string;
   date: Date;
+  executionDate: Date;
+  dueDate: Date;
   supplierName: string;
   description: string;
   quantity: number;

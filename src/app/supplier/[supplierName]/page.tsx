@@ -171,6 +171,8 @@ export default function SupplierReportPage() {
                 <TableHead>التاريخ</TableHead>
                 <TableHead>الوصف</TableHead>
                 <TableHead>الكمية</TableHead>
+                <TableHead>تاريخ التنفيذ</TableHead>
+                <TableHead>تاريخ الاستحقاق</TableHead>
                 <TableHead>إجمالي الشراء</TableHead>
                 <TableHead>المدفوع للمصنع</TableHead>
                 <TableHead>المستلم من المورد</TableHead>
@@ -184,6 +186,8 @@ export default function SupplierReportPage() {
                     <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                     <TableCell className="font-medium">{t.description}</TableCell>
                     <TableCell>{t.quantity}</TableCell>
+                    <TableCell>{format(t.executionDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                    <TableCell>{format(t.dueDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                     <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
@@ -192,7 +196,7 @@ export default function SupplierReportPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={9} className="h-24 text-center">
                     لا توجد عمليات لهذا المورد.
                   </TableCell>
                 </TableRow>
