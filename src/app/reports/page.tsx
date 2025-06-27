@@ -7,74 +7,90 @@ import { useTransactions } from '@/context/transactions-context';
 import { governorates } from '@/data/egypt-governorates';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { type DateRange } from 'react-day-picker';
 import { Bar, ComposedChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Line } from 'recharts';
-import { ArrowRight, DollarSign, LineChart } from 'lucide-react';
+import { ArrowRight, DollarSign, LineChart, Calendar as CalendarIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 export default function ReportsPage() {
   const { transactions } = useTransactions();
 
   const [selectedGovernorate, setSelectedGovernorate] = useState<string>('all');
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  
-  const uniqueMonths = useMemo(() => {
-    const months = new Set<string>();
-    transactions.forEach(t => months.add(format(t.date, 'yyyy-MM')));
-    return Array.from(months).sort().reverse();
-  }, [transactions]);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [groupBy, setGroupBy] = useState<'location' | 'month'>('location');
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
-      const governorateMatch = selectedGovernorate === 'all' || t.governorate === selectedGovernorate;
-      const monthMatch = selectedMonth === 'all' || format(t.date, 'yyyy-MM') === selectedMonth;
-      return governorateMatch && monthMatch;
-    });
-  }, [transactions, selectedGovernorate, selectedMonth]);
-
-  const { chartData, tableData, groupingKey } = useMemo(() => {
-    let key: 'governorate' | 'city' | 'month' = 'governorate';
-    if (selectedGovernorate !== 'all' && selectedMonth === 'all') {
-        key = 'month';
-    } else if (selectedGovernorate !== 'all' && selectedMonth !== 'all') {
-        key = 'city';
-    } else if (selectedGovernorate === 'all' && selectedMonth !== 'all') {
-        key = 'governorate';
-    } else { // both 'all'
-        key = 'governorate';
+    const toDate = dateRange?.to ? new Date(dateRange.to) : undefined;
+    if (toDate) {
+      toDate.setHours(23, 59, 59, 999); // Include the whole day
     }
 
-    const dataMap = new Map<string, { name: string, totalSales: number, totalProfit: number, count: number, profitPercentage: number }>();
-
-    filteredTransactions.forEach(t => {
-      let groupName: string;
-      if (key === 'month') {
-        groupName = format(t.date, 'MMMM yyyy', { locale: ar });
-      } else {
-        groupName = t[key] || 'غير محدد';
-        if (key === 'city' && groupName === 'غير محدد') groupName = `(${t.governorate} - غير محدد)`
-      }
-
-      if (!dataMap.has(groupName)) {
-        dataMap.set(groupName, { name: groupName, totalSales: 0, totalProfit: 0, count: 0, profitPercentage: 0 });
-      }
-      const current = dataMap.get(groupName)!;
-      current.totalSales += t.totalSellingPrice;
-      current.totalProfit += t.profit;
-      current.count += 1;
+    return transactions.filter(t => {
+      const governorateMatch = selectedGovernorate === 'all' || t.governorate === selectedGovernorate;
+      const dateMatch =
+        !dateRange?.from ||
+        (t.date >= dateRange.from && (!toDate || t.date <= toDate));
+      return governorateMatch && dateMatch;
     });
-    
-    // Calculate percentage after aggregation
+  }, [transactions, selectedGovernorate, dateRange]);
+
+  const { chartData, tableData, groupingKeyHeader } = useMemo(() => {
+    const dataMap = new Map<string, { name: string, totalSales: number, totalProfit: number, count: number, profitPercentage: number }>();
+    let header = 'المجموعة';
+
+    if (groupBy === 'month') {
+        header = 'الشهر';
+        filteredTransactions.forEach(t => {
+            const groupKey = format(t.date, 'yyyy-MM');
+            const displayName = format(new Date(groupKey + '-02'), 'MMMM yyyy', { locale: ar });
+
+            if (!dataMap.has(groupKey)) {
+                dataMap.set(groupKey, { name: displayName, totalSales: 0, totalProfit: 0, count: 0, profitPercentage: 0 });
+            }
+            const current = dataMap.get(groupKey)!;
+            current.totalSales += t.totalSellingPrice;
+            current.totalProfit += t.profit;
+            current.count += 1;
+        });
+    } else { // groupBy === 'location'
+        const isGovSelected = selectedGovernorate !== 'all';
+        header = isGovSelected ? 'المركز' : 'المحافظة';
+        
+        filteredTransactions.forEach(t => {
+            let groupName: string = isGovSelected ? (t.city || `(${t.governorate} - غير محدد)`) : t.governorate;
+            
+            if (!dataMap.has(groupName)) {
+                dataMap.set(groupName, { name: groupName, totalSales: 0, totalProfit: 0, count: 0, profitPercentage: 0 });
+            }
+            const current = dataMap.get(groupName)!;
+            current.totalSales += t.totalSellingPrice;
+            current.totalProfit += t.profit;
+            current.count += 1;
+        });
+    }
+
     for (const value of dataMap.values()) {
         value.profitPercentage = value.totalSales > 0 ? (value.totalProfit / value.totalSales) * 100 : 0;
     }
+    
+    const sortedEntries = Array.from(dataMap.entries()).sort((a, b) => {
+        if (groupBy === 'month') {
+            return a[0].localeCompare(b[0]); // Sort by 'YYYY-MM' key
+        }
+        return b[1].totalSales - a[1].totalSales; // Sort by sales for location
+    });
 
-    const sortedData = Array.from(dataMap.values()).sort((a, b) => b.totalSales - a.totalSales);
-    return { chartData: sortedData, tableData: sortedData, groupingKey: key };
-  }, [filteredTransactions, selectedGovernorate, selectedMonth]);
+    const finalData = sortedEntries.map(entry => entry[1]);
+    
+    return { chartData: finalData, tableData: finalData, groupingKeyHeader: header };
+  }, [filteredTransactions, selectedGovernorate, groupBy]);
 
   const totalReportStats = useMemo(() => {
     return filteredTransactions.reduce((acc, t) => {
@@ -84,21 +100,25 @@ export default function ReportsPage() {
     }, { totalSales: 0, totalProfit: 0 });
   }, [filteredTransactions]);
   
-  const getGroupingKeyHeader = () => {
-    switch(groupingKey) {
-        case 'governorate': return 'المحافظة';
-        case 'city': return 'المركز';
-        case 'month': return 'الشهر';
-        default: return 'المجموعة';
+  const reportTitle = useMemo(() => {
+    let titleParts = [];
+    if (selectedGovernorate !== 'all') {
+      titleParts.push(`لمحافظة ${selectedGovernorate}`);
     }
-  };
+    if (dateRange?.from) {
+      const from = format(dateRange.from, 'd MMM yyyy', { locale: ar });
+      const to = dateRange.to ? format(dateRange.to, 'd MMM yyyy', { locale: ar }) : from;
+      titleParts.push(`في الفترة من ${from} إلى ${to}`);
+    }
+    return titleParts.length > 0 ? `(${titleParts.join('، و')})` : '';
+  }, [selectedGovernorate, dateRange]);
 
   return (
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
-        <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
+        <h1 className="text-xl md:text-3xl font-bold text-primary flex items-center gap-2">
           <LineChart className="w-8 h-8" />
-          تقارير المبيعات والأرباح
+          تقارير المبيعات والأرباح {reportTitle}
         </h1>
         <Button asChild variant="outline">
           <Link href="/">
@@ -111,7 +131,7 @@ export default function ReportsPage() {
         <CardHeader>
           <CardTitle>فلترة التقارير</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col md:flex-row gap-4">
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex-1">
             <label className="text-sm font-medium mb-2 block">المحافظة</label>
             <Select value={selectedGovernorate} onValueChange={setSelectedGovernorate}>
@@ -125,18 +145,54 @@ export default function ReportsPage() {
             </Select>
           </div>
           <div className="flex-1">
-            <label className="text-sm font-medium mb-2 block">الشهر</label>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <label className="text-sm font-medium mb-2 block">المدة الزمنية</label>
+             <Popover>
+                <PopoverTrigger asChild>
+                    <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                            "w-full justify-start text-right font-normal",
+                            !dateRange && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="ml-2 h-4 w-4" />
+                        {dateRange?.from ? (
+                            dateRange.to ? (
+                                <>
+                                    {format(dateRange.from, "dd MMM yyyy", { locale: ar })} -{" "}
+                                    {format(dateRange.to, "dd MMM yyyy", { locale: ar })}
+                                </>
+                            ) : (
+                                format(dateRange.from, "dd MMM yyyy", { locale: ar })
+                            )
+                        ) : (
+                            <span>اختر مدة زمنية</span>
+                        )}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
+                        locale={ar}
+                    />
+                </PopoverContent>
+            </Popover>
+          </div>
+          <div className="flex-1">
+            <label className="text-sm font-medium mb-2 block">تجميع حسب</label>
+            <Select value={groupBy} onValueChange={(value) => setGroupBy(value as 'location' | 'month')}>
               <SelectTrigger>
-                <SelectValue placeholder="اختر شهرًا" />
+                <SelectValue placeholder="تجميع حسب..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">كل الشهور</SelectItem>
-                {uniqueMonths.map(month => (
-                  <SelectItem key={month} value={month}>
-                    {format(new Date(month + '-02'), 'MMMM yyyy', { locale: ar })}
-                  </SelectItem>
-                ))}
+                <SelectItem value="location">المحافظة/المركز</SelectItem>
+                <SelectItem value="month">الشهر</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -216,7 +272,7 @@ export default function ReportsPage() {
            <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{getGroupingKeyHeader()}</TableHead>
+                <TableHead>{groupingKeyHeader}</TableHead>
                 <TableHead>إجمالي المبيعات</TableHead>
                 <TableHead>صافي الربح</TableHead>
                 <TableHead>نسبة الربح</TableHead>
@@ -252,3 +308,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
