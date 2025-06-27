@@ -1,11 +1,10 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // هذه القاعدة تسمح لأي شخص بقراءة وكتابة جميع المستندات في قاعدة بياناتك.
-    // تحذير: هذا مخصص لأغراض التطوير فقط وهو غير آمن.
-    // قبل النشر للإنتاج، يجب عليك كتابة قواعد أكثر أمانًا.
-    match /{document=**} {
+    match /transactions/{transactionId} {
+      allow read, write: if true;
+    }
+    match /expenses/{expenseId} {
       allow read, write: if true;
     }
   }
