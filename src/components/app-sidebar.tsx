@@ -1,8 +1,10 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { BookUser, LineChart, Factory, Users, SidebarClose } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { BookUser, LineChart, Factory, Users, SidebarClose, LogOut } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 import {
   Sidebar,
@@ -11,13 +13,34 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  useSidebar
+  useSidebar,
+  SidebarFooter
 } from '@/components/ui/sidebar';
 import { Button } from './ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { toast } = useToast();
   const { setOpenMobile } = useSidebar();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+      toast({
+        title: 'تم تسجيل الخروج',
+        description: 'تم تسجيل خروجك بنجاح.',
+      });
+    } catch (error) {
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ أثناء تسجيل الخروج.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const menuItems = [
     { href: '/', label: 'لوحة التحكم', icon: BookUser, isActive: () => pathname === '/' },
@@ -51,6 +74,16 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleLogout} tooltip={{ children: 'تسجيل الخروج' }}>
+              <LogOut />
+              <span>تسجيل الخروج</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }

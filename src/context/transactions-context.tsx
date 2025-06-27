@@ -15,6 +15,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from './auth-context';
 
 interface TransactionsContextType {
   transactions: Transaction[];
@@ -31,18 +32,25 @@ interface TransactionsContextType {
 const TransactionsContext = createContext<TransactionsContextType | undefined>(undefined);
 
 export function TransactionsProvider({ children }: { children: ReactNode }) {
+  const { currentUser } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const transactionsCollectionRef = collection(db, 'transactions');
-  const expensesCollectionRef = collection(db, 'expenses');
-
   useEffect(() => {
     const fetchData = async () => {
+      if (!currentUser) {
+        setTransactions([]);
+        setExpenses([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
+        const transactionsCollectionRef = collection(db, 'users', currentUser.uid, 'transactions');
+        const expensesCollectionRef = collection(db, 'users', currentUser.uid, 'expenses');
+        
         // Fetch transactions
         const transactionSnapshot = await getDocs(transactionsCollectionRef);
         const fetchedTransactions = transactionSnapshot.docs.map(doc => {
@@ -79,10 +87,12 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
 
     fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser]);
 
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
+    if (!currentUser) return;
     try {
+      const transactionsCollectionRef = collection(db, 'users', currentUser.uid, 'transactions');
       const docData = {
         ...transaction,
         date: transaction.date.toISOString(),
@@ -98,9 +108,10 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   };
 
   const updateTransaction = async (updatedTransaction: Transaction) => {
+    if (!currentUser) return;
      try {
       const { id, ...dataToUpdate } = updatedTransaction;
-      const transactionDoc = doc(db, 'transactions', id);
+      const transactionDoc = doc(db, 'users', currentUser.uid, 'transactions', id);
       const docData = {
         ...dataToUpdate,
         date: updatedTransaction.date.toISOString(),
@@ -119,7 +130,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteSupplier = async (supplierName: string) => {
+    if (!currentUser) return;
      try {
+      const transactionsCollectionRef = collection(db, 'users', currentUser.uid, 'transactions');
       const batch = writeBatch(db);
       const q = query(transactionsCollectionRef, where("supplierName", "==", supplierName));
       const querySnapshot = await getDocs(q);
@@ -138,7 +151,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   };
   
   const addExpense = async (expense: Omit<Expense, 'id'>) => {
+    if (!currentUser) return;
     try {
+      const expensesCollectionRef = collection(db, 'users', currentUser.uid, 'expenses');
       const docData = {
         ...expense,
         date: expense.date.toISOString(),
@@ -152,9 +167,10 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   };
 
   const updateExpense = async (updatedExpense: Expense) => {
+    if (!currentUser) return;
      try {
       const { id, ...dataToUpdate } = updatedExpense;
-      const expenseDoc = doc(db, 'expenses', id);
+      const expenseDoc = doc(db, 'users', currentUser.uid, 'expenses', id);
       const docData = {
         ...dataToUpdate,
         date: updatedExpense.date.toISOString(),
@@ -171,8 +187,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteExpense = async (expenseId: string) => {
+    if (!currentUser) return;
     try {
-      const expenseDoc = doc(db, 'expenses', expenseId);
+      const expenseDoc = doc(db, 'users', currentUser.uid, 'expenses', expenseId);
       await deleteDoc(expenseDoc);
       setExpenses(prev => prev.filter(e => e.id !== expenseId));
     } catch (error) {

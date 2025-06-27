@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { TransactionsProvider } from '@/context/transactions-context';
+import { AuthProvider } from '@/context/auth-context';
 import { MainLayout } from '@/components/main-layout';
 
 export const metadata: Metadata = {
@@ -22,12 +23,14 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></link>
       </head>
       <body className="font-body antialiased">
-        <TransactionsProvider>
-          <MainLayout>
-            {children}
-          </MainLayout>
-          <Toaster />
-        </TransactionsProvider>
+        <AuthProvider>
+          <TransactionsProvider>
+            <MainLayout>
+              {children}
+            </MainLayout>
+            <Toaster />
+          </TransactionsProvider>
+        </AuthProvider>
       </body>
     </html>
   );
