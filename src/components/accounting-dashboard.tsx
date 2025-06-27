@@ -18,14 +18,17 @@ import {
   MinusCircle,
   Wallet,
   Trash2,
+  Wand2,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 import { type Transaction, type Expense } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -64,6 +67,7 @@ import {
 import { SidebarTrigger } from './ui/sidebar';
 import { Skeleton } from './ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { analyzePerformance } from '@/ai/flows/analyze-performance-flow';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -101,6 +105,8 @@ export default function AccountingDashboard() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const { toast } = useToast();
+  const [analysis, setAnalysis] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -376,6 +382,47 @@ export default function AccountingDashboard() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+  
+  const handleAnalyzePerformance = async () => {
+    if (transactions.length === 0) {
+      toast({
+        title: 'لا توجد بيانات كافية',
+        description: 'يجب إضافة بعض العمليات أولاً قبل طلب التحليل.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysis(''); // Clear previous analysis
+
+    try {
+      const analysisInput = {
+        transactions: transactions.map(t => ({
+          date: t.date.toISOString(),
+          supplierName: t.supplierName,
+          governorate: t.governorate,
+          city: t.city,
+          totalSellingPrice: t.totalSellingPrice,
+          profit: t.profit,
+        })),
+        totalProfit: totalProfit,
+        totalExpenses: totalExpenses,
+      };
+
+      const result = await analyzePerformance(analysisInput);
+      setAnalysis(result);
+    } catch (error) {
+      console.error("Error generating analysis:", error);
+      toast({
+        title: 'خطأ في التحليل',
+        description: 'حدث خطأ أثناء توليد التحليل. يرجى المحاولة مرة أخرى.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const totalPurchasePriceDisplay = (watchedValues.quantity || 0) * (watchedValues.purchasePrice || 0);
@@ -875,7 +922,7 @@ export default function AccountingDashboard() {
         </Card>
       </div>
       
-      <div className="lg:col-span-3 mb-8">
+      <div className="mb-8">
           <Card>
               <CardHeader>
                   <CardTitle>سجل العمليات</CardTitle>
@@ -962,9 +1009,9 @@ export default function AccountingDashboard() {
           </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="lg:col-span-1">
+           <Card className="h-full flex flex-col">
               <CardHeader>
                   <CardTitle className="flex items-center gap-2"><LineChart/> ملخص الربح الشهري</CardTitle>
               </CardHeader>
@@ -987,7 +1034,41 @@ export default function AccountingDashboard() {
               </CardContent>
           </Card>
         </div>
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 flex flex-col gap-8">
+           <Card className="flex-1 flex flex-col">
+              <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Wand2/> تحليل مالي بالذكاء الاصطناعي</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-grow flex flex-col">
+                  {isAnalyzing ? (
+                      <div className="space-y-4 flex-grow p-4 text-center flex flex-col justify-center">
+                          <p className="text-sm text-muted-foreground">جاري تحليل البيانات، قد يستغرق الأمر بضع ثوانٍ...</p>
+                          <Skeleton className="h-4 w-5/6 mx-auto" />
+                          <Skeleton className="h-4 w-full mx-auto" />
+                          <Skeleton className="h-4 w-4/6 mx-auto" />
+                      </div>
+                  ) : analysis ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none text-right text-sm h-64 overflow-y-auto">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{analysis}</ReactMarkdown>
+                      </div>
+                  ) : (
+                      <div className="text-center text-muted-foreground flex-grow flex flex-col justify-center items-center gap-4">
+                          <p className="text-sm">احصل على رؤى حول أدائك المالي، وتعرف على أفضل الموردين والمناطق مبيعًا.</p>
+                          <Button onClick={handleAnalyzePerformance} disabled={isAnalyzing}>
+                            <Wand2 className="ml-2 h-4 w-4" />
+                            {isAnalyzing ? "جاري التحليل..." : "توليد التحليل"}
+                          </Button>
+                      </div>
+                  )}
+              </CardContent>
+               {transactions.length > 0 && !analysis && !isAnalyzing && (
+                <CardFooter>
+                  <p className="text-xs text-muted-foreground w-full text-center">
+                    يتم إنشاء التحليل بناءً على البيانات الحالية.
+                  </p>
+                </CardFooter>
+              )}
+            </Card>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Wallet/> سجل المصروفات</CardTitle>
