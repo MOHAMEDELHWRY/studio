@@ -14,6 +14,7 @@ import {
   LineChart,
   Calendar as CalendarIcon,
   ShoppingCart,
+  Users,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { format } from 'date-fns';
@@ -162,14 +163,27 @@ export default function AccountingDashboard() {
   }, [filteredAndSortedTransactions, transactionBalances]);
 
 
-  const { totalSales, totalPurchases, totalProfit } = useMemo(() => {
-    return filteredAndSortedTransactions.reduce((acc, t) => {
+  const { totalSales, totalPurchases, totalProfit, totalSuppliersBalance } = useMemo(() => {
+    const stats = filteredAndSortedTransactions.reduce((acc, t) => {
         acc.totalSales += t.totalSellingPrice;
         acc.totalPurchases += t.totalPurchasePrice;
         acc.totalProfit += t.profit;
         return acc;
     }, { totalSales: 0, totalPurchases: 0, totalProfit: 0 });
-  }, [filteredAndSortedTransactions]);
+
+    const suppliersInFilter = [...new Set(filteredAndSortedTransactions.map(t => t.supplierName))];
+    
+    const balance = suppliersInFilter.reduce((acc, supplierName) => {
+        const supplierTotalBalance = transactions
+            .filter(t => t.supplierName === supplierName)
+            .reduce((balance, t) => {
+                return balance + t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+            }, 0);
+        return acc + supplierTotalBalance;
+    }, 0);
+
+    return { ...stats, totalSuppliersBalance: balance };
+  }, [filteredAndSortedTransactions, transactions]);
 
   const chartData = useMemo(() => {
     const monthlyData: { [key: string]: { profit: number } } = {};
@@ -426,7 +440,7 @@ export default function AccountingDashboard() {
         </div>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي المشتريات</CardTitle>
@@ -438,6 +452,17 @@ export default function AccountingDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">إجمالي رصيد الموردين</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${totalSuppliersBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
+              {totalSuppliersBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي المبيعات</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -445,7 +470,7 @@ export default function AccountingDashboard() {
             <div className="text-2xl font-bold">{totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div>
           </CardContent>
         </Card>
-        <Card className="md:col-span-2 lg:col-span-1">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">صافي الربح</CardTitle>
             <LineChart className="h-4 w-4 text-muted-foreground" />
@@ -567,5 +592,3 @@ export default function AccountingDashboard() {
     </div>
   );
 }
-
-    
