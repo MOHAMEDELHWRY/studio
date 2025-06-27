@@ -17,23 +17,19 @@ export default function SimplifiedSalesReport() {
     return typeof name === 'string' ? decodeURIComponent(name) : '';
   }, [params.supplierName]);
 
-  const supplierTransactionsAsc = useMemo(() => {
-    if (!supplierName) return [];
-    return transactions
+  const { transactionsWithBalances, supplierStats } = useMemo(() => {
+    if (!supplierName) {
+        return { 
+            transactionsWithBalances: [],
+            supplierStats: { totalSales: 0, totalReceivedFromSupplier: 0 }
+        };
+    }
+
+    const supplierTransactionsAsc = transactions
       .filter(t => t.supplierName === supplierName)
       .sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [transactions, supplierName]);
-  
-  const transactionsWithBalances = useMemo(() => {
-    let salesBalance = 0;
-    return supplierTransactionsAsc.map(t => {
-      salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-      return { ...t, salesRunningBalance: salesBalance };
-    }).sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [supplierTransactionsAsc]);
-
-  const supplierStats = useMemo(() => {
-    return supplierTransactionsAsc.reduce((acc, t) => {
+      
+    const stats = supplierTransactionsAsc.reduce((acc, t) => {
       acc.totalSales += t.totalSellingPrice;
       acc.totalReceivedFromSupplier += t.amountReceivedFromSupplier;
       return acc;
@@ -41,7 +37,15 @@ export default function SimplifiedSalesReport() {
       totalSales: 0, 
       totalReceivedFromSupplier: 0,
     });
-  }, [supplierTransactionsAsc]);
+    
+    let salesBalance = 0;
+    const balances = supplierTransactionsAsc.map(t => {
+      salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
+      return { ...t, salesRunningBalance: salesBalance };
+    }).sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    return { transactionsWithBalances: balances, supplierStats: stats };
+  }, [transactions, supplierName]);
 
   const finalSalesBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].salesRunningBalance : 0;
 
