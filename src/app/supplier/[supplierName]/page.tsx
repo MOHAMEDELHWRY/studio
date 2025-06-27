@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { ArrowRight, DollarSign, Package, Trash2, Factory, Briefcase, Share2, Landmark, PackageCheck, Warehouse } from 'lucide-react';
+import { ArrowRight, DollarSign, Package, Trash2, Factory, Briefcase, Share2, Landmark, PackageCheck, Warehouse, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -110,6 +110,12 @@ export default function SupplierReportPage() {
                 مشاركة / طباعة
               </Link>
            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/sales-balance-report/${encodeURIComponent(supplierName)}`} target="_blank" rel="noopener noreferrer">
+                <FileText className="ml-2 h-4 w-4" />
+                تقرير رصيد المبيعات
+              </Link>
+            </Button>
            <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive">

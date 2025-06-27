@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
-import { ArrowRight, Users, Factory, Share2 } from 'lucide-react';
+import { ArrowRight, Users, Factory, Share2, FileText } from 'lucide-react';
 import { type Transaction } from '@/types';
 
 import { Button } from '@/components/ui/button';
@@ -156,12 +156,20 @@ export default function SuppliersReportPage() {
                       {item.finalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
                     </TableCell>
                     <TableCell>
-                      <Button asChild variant="ghost" size="icon">
-                        <Link href={`/share/supplier/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer">
-                          <Share2 className="h-4 w-4" />
-                          <span className="sr-only">مشاركة تقرير {item.supplierName}</span>
-                        </Link>
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button asChild variant="ghost" size="icon">
+                          <Link href={`/sales-balance-report/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`التقرير المبسط لـ ${item.supplierName}`}>
+                            <FileText className="h-4 w-4" />
+                            <span className="sr-only">التقرير المبسط لـ {item.supplierName}</span>
+                          </Link>
+                        </Button>
+                        <Button asChild variant="ghost" size="icon">
+                          <Link href={`/share/supplier/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`مشاركة تقرير ${item.supplierName}`}>
+                            <Share2 className="h-4 w-4" />
+                            <span className="sr-only">مشاركة تقرير {item.supplierName}</span>
+                          </Link>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
