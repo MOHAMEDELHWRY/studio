@@ -89,7 +89,7 @@ export default function ShareableSupplierReport() {
       <div className="printable-content">
         <section className="mb-8">
           <h2 className="text-lg font-bold mb-4 border-b pb-2">ملخص الحسابات</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
               <div className="p-2 sm:p-4 border rounded-lg">
                   <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المشتريات</h3>
                   <p className="text-base sm:text-xl font-bold text-gray-800">{supplierStats.totalPurchases.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
@@ -97,6 +97,10 @@ export default function ShareableSupplierReport() {
               <div className="p-2 sm:p-4 border rounded-lg">
                   <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المبيعات</h3>
                   <p className="text-base sm:text-xl font-bold text-gray-800">{supplierStats.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
+              </div>
+               <div className="p-2 sm:p-4 border rounded-lg">
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم من المورد</h3>
+                  <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">
                   <h3 className="text-xs sm:text-sm font-medium text-gray-600">رصيد المبيعات النهائي</h3>
