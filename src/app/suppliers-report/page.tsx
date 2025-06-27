@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
-import { ArrowRight, Users, DollarSign, Briefcase } from 'lucide-react';
+import { ArrowRight, Users, DollarSign, Briefcase, Share2 } from 'lucide-react';
 import { type Transaction } from '@/types';
 
 import { Button } from '@/components/ui/button';
@@ -101,6 +101,7 @@ export default function SuppliersReportPage() {
                 <TableHead>عدد العمليات</TableHead>
                 <TableHead>الرصيد النهائي (مبيعات)</TableHead>
                 <TableHead>الرصيد النقدي النهائي</TableHead>
+                <TableHead>إجراءات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -124,11 +125,19 @@ export default function SuppliersReportPage() {
                      <TableCell className={`font-bold ${item.finalCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
                       {item.finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
                     </TableCell>
+                    <TableCell>
+                      <Button asChild variant="ghost" size="icon">
+                        <Link href={`/share/supplier/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer">
+                          <Share2 className="h-4 w-4" />
+                          <span className="sr-only">مشاركة تقرير {item.supplierName}</span>
+                        </Link>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     لا يوجد موردين لعرضهم. قم بإضافة عمليات أولاً.
                   </TableCell>
                 </TableRow>

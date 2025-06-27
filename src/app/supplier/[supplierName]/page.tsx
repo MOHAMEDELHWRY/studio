@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { ArrowRight, DollarSign, Package, Trash2, TrendingUp, TrendingDown, Briefcase } from 'lucide-react';
+import { ArrowRight, DollarSign, Package, Trash2, TrendingUp, TrendingDown, Briefcase, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -87,7 +87,13 @@ export default function SupplierReportPage() {
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-primary">تقرير المورد: {supplierName}</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+           <Button asChild variant="outline">
+              <Link href={`/share/supplier/${encodeURIComponent(supplierName)}`} target="_blank" rel="noopener noreferrer">
+                <Share2 className="ml-2 h-4 w-4" />
+                مشاركة / طباعة
+              </Link>
+           </Button>
            <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive">
