@@ -81,8 +81,8 @@ export default function SupplierReportPage() {
   const finalCashFlowBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].cashFlowRunningBalance : 0;
   const finalFactoryBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].factoryRunningBalance : 0;
   
-  const handleDeleteSupplier = () => {
-    deleteSupplier(supplierName);
+  const handleDeleteSupplier = async () => {
+    await deleteSupplier(supplierName);
     toast({
       title: 'تم الحذف',
       description: `تم حذف المورد "${supplierName}" وجميع عملياته بنجاح.`,

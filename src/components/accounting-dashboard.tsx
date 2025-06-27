@@ -62,6 +62,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { SidebarTrigger } from './ui/sidebar';
+import { Skeleton } from './ui/skeleton';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -90,7 +91,7 @@ const expenseSchema = z.object({
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 export default function AccountingDashboard() {
-  const { transactions, addTransaction, updateTransaction, expenses, addExpense, updateExpense, deleteExpense } = useTransactions();
+  const { transactions, addTransaction, updateTransaction, expenses, addExpense, updateExpense, deleteExpense, loading } = useTransactions();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -208,7 +209,7 @@ export default function AccountingDashboard() {
   };
 
 
-  const onSubmit = (values: TransactionFormValues) => {
+  const onSubmit = async (values: TransactionFormValues) => {
     try {
         const totalPurchasePrice = values.quantity * values.purchasePrice;
         const totalSellingPrice = values.quantity * values.sellingPrice;
@@ -223,15 +224,14 @@ export default function AccountingDashboard() {
               totalSellingPrice,
               profit,
             };
-            updateTransaction(updatedTransaction);
+            await updateTransaction(updatedTransaction);
             toast({
               title: "نجاح",
               description: "تم تعديل العملية بنجاح.",
               variant: "default"
             });
         } else {
-            const newTransaction: Transaction = {
-              id: new Date().toISOString(),
+            const newTransaction: Omit<Transaction, 'id'> = {
               ...values,
               city: values.city ?? "",
               totalPurchasePrice,
@@ -239,7 +239,7 @@ export default function AccountingDashboard() {
               profit,
             };
             
-            addTransaction(newTransaction);
+            await addTransaction(newTransaction);
             toast({
               title: "نجاح",
               description: "تمت إضافة العملية بنجاح.",
@@ -257,20 +257,20 @@ export default function AccountingDashboard() {
     }
   };
   
-  const onSubmitExpense = (values: ExpenseFormValues) => {
+  const onSubmitExpense = async (values: ExpenseFormValues) => {
     if (editingExpense) {
-      updateExpense({ ...editingExpense, ...values });
+      await updateExpense({ ...editingExpense, ...values });
       toast({ title: "نجاح", description: "تم تعديل المصروف بنجاح." });
     } else {
-      addExpense({ ...values, id: new Date().toISOString() });
+      await addExpense(values);
       toast({ title: "نجاح", description: "تمت إضافة المصروف بنجاح." });
     }
     expenseForm.reset();
     setIsExpenseDialogOpen(false);
   };
 
-  const handleDeleteExpense = (expenseId: string) => {
-    deleteExpense(expenseId);
+  const handleDeleteExpense = async (expenseId: string) => {
+    await deleteExpense(expenseId);
     toast({
       title: "تم الحذف",
       description: "تم حذف المصروف بنجاح.",
@@ -381,6 +381,51 @@ export default function AccountingDashboard() {
   const totalSellingPriceDisplay = (watchedValues.quantity || 0) * (watchedValues.sellingPrice || 0);
   const profitDisplay = totalSellingPriceDisplay - totalPurchasePriceDisplay - (watchedValues.taxes || 0);
   
+  if (loading) {
+    return (
+      <div className="container mx-auto p-4 md:p-8 animate-pulse">
+        <header className="flex items-center justify-between mb-8 gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <h1 className="text-3xl font-bold text-primary">لوحة التحكم</h1>
+          </div>
+          <div className="flex gap-2 flex-wrap justify-center">
+            <Skeleton className="h-10 w-36" />
+            <Skeleton className="h-10 w-36" />
+            <Skeleton className="h-10 w-36" />
+          </div>
+        </header>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <Card><CardHeader><Skeleton className="h-4 w-3/4 rounded" /></CardHeader><CardContent><Skeleton className="h-8 w-1/2 rounded" /></CardContent></Card>
+          <Card><CardHeader><Skeleton className="h-4 w-3/4 rounded" /></CardHeader><CardContent><Skeleton className="h-8 w-1/2 rounded" /></CardContent></Card>
+          <Card><CardHeader><Skeleton className="h-4 w-3/4 rounded" /></CardHeader><CardContent><Skeleton className="h-8 w-1/2 rounded" /></CardContent></Card>
+          <Card><CardHeader><Skeleton className="h-4 w-3/4 rounded" /></CardHeader><CardContent><Skeleton className="h-8 w-1/2 rounded" /></CardContent></Card>
+        </div>
+        
+        <div className="mb-8">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-1/4 rounded" />
+              <div className="flex flex-col md:flex-row gap-2 mt-4">
+                <Skeleton className="h-10 flex-1 rounded" />
+                <Skeleton className="h-10 w-[240px] rounded" />
+              </div>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-2">
+                    <Skeleton className="h-12 w-full rounded" />
+                    <Skeleton className="h-12 w-full rounded" />
+                    <Skeleton className="h-12 w-full rounded" />
+                    <Skeleton className="h-12 w-full rounded" />
+                </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex items-center justify-between mb-8 gap-4 flex-wrap">
