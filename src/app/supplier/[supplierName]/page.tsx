@@ -155,19 +155,19 @@ export default function SupplierReportPage() {
             <div className={`text-2xl font-bold ${finalCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
               {finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
-            <p className="text-xs text-muted-foreground">مستلم من المورد - مدفوع للمصنع</p>
+            <p className="text-xs text-muted-foreground">(المستلم من المورد) - (المدفوع للمصنع)</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">الرصيد النهائي (مبيعات)</CardTitle>
+            <CardTitle className="text-sm font-medium">رصيد المبيعات النهائي</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
               {finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
-             <p className="text-xs text-muted-foreground">مستلم من المورد - إجمالي البيع</p>
+             <p className="text-xs text-muted-foreground">(المستلم من المورد) - (إجمالي البيع)</p>
           </CardContent>
         </Card>
       </div>

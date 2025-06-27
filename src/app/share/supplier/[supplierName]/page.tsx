@@ -100,7 +100,7 @@ export default function ShareableSupplierReport() {
                   <p className={'text-base sm:text-xl font-bold ' + (finalCashFlowBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">الرصيد النهائي (مبيعات)</h3>
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">رصيد المبيعات النهائي</h3>
                   <p className={'text-base sm:text-xl font-bold ' + (finalSalesBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
           </div>

@@ -99,7 +99,7 @@ export default function SuppliersReportPage() {
                 <TableHead>اسم المورد</TableHead>
                 <TableHead>إجمالي المبيعات</TableHead>
                 <TableHead>عدد العمليات</TableHead>
-                <TableHead>الرصيد النهائي (مبيعات)</TableHead>
+                <TableHead>رصيد المبيعات النهائي</TableHead>
                 <TableHead>الرصيد النقدي النهائي</TableHead>
                 <TableHead>إجراءات</TableHead>
               </TableRow>
