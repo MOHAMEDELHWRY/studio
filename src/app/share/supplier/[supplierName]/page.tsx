@@ -42,9 +42,22 @@ export default function ShareableSupplierReport() {
       acc.totalSales += t.totalSellingPrice;
       acc.totalPaidToFactory += t.amountPaidToFactory;
       acc.totalReceivedFromSupplier += t.amountReceivedFromSupplier;
+      acc.totalTonsPurchased += t.quantity;
+      if (t.totalSellingPrice > 0) {
+        acc.totalTonsSold += t.quantity;
+      }
       return acc;
-    }, { totalPurchases: 0, totalSales: 0, totalPaidToFactory: 0, totalReceivedFromSupplier: 0 });
+    }, { 
+      totalPurchases: 0, 
+      totalSales: 0, 
+      totalPaidToFactory: 0, 
+      totalReceivedFromSupplier: 0,
+      totalTonsPurchased: 0,
+      totalTonsSold: 0
+    });
   }, [supplierTransactionsAsc]);
+
+  const tonsRemaining = supplierStats.totalTonsPurchased - supplierStats.totalTonsSold;
 
   const finalSalesBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].salesRunningBalance : 0;
   const finalCashFlowBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].cashFlowRunningBalance : 0;
@@ -103,6 +116,18 @@ export default function ShareableSupplierReport() {
                   <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">
+                <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي الأطنان المشتراة</h3>
+                <p className="text-base sm:text-xl font-bold text-gray-800">{supplierStats.totalTonsPurchased.toLocaleString('ar-EG')} طن</p>
+              </div>
+              <div className="p-2 sm:p-4 border rounded-lg">
+                <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي الأطنان المباعة</h3>
+                <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalTonsSold.toLocaleString('ar-EG')} طن</p>
+              </div>
+              <div className="p-2 sm:p-4 border rounded-lg">
+                <h3 className="text-xs sm:text-sm font-medium text-gray-600">الأطنان المتبقية</h3>
+                <p className={'text-base sm:text-xl font-bold ' + (tonsRemaining >= 0 ? 'text-green-600' : 'text-red-600')}>{tonsRemaining.toLocaleString('ar-EG')} طن</p>
+              </div>
+              <div className="p-2 sm:p-4 border rounded-lg">
                   <h3 className="text-xs sm:text-sm font-medium text-gray-600">رصيد المبيعات النهائي</h3>
                   <p className={'text-base sm:text-xl font-bold ' + (finalSalesBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
@@ -125,6 +150,7 @@ export default function ShareableSupplierReport() {
                   <tr>
                     <th className="p-2 border font-semibold text-gray-700">التاريخ</th>
                     <th className="p-2 border font-semibold text-gray-700">الوصف</th>
+                    <th className="p-2 border font-semibold text-gray-700">الكمية (طن)</th>
                     <th className="p-2 border font-semibold text-gray-700">إجمالي الشراء</th>
                     <th className="p-2 border font-semibold text-gray-700">إجمالي البيع</th>
                     <th className="p-2 border font-semibold text-gray-700">المدفوع للمصنع</th>
@@ -140,6 +166,7 @@ export default function ShareableSupplierReport() {
                       <tr key={t.id} className="border-b hover:bg-gray-50">
                         <td className="p-2 border whitespace-nowrap">{format(t.date, 'dd-MM-yyyy', { locale: ar })}</td>
                         <td className="p-2 border font-medium">{t.description}</td>
+                        <td className="p-2 border whitespace-nowrap">{t.quantity.toLocaleString('ar-EG')}</td>
                         <td className="p-2 border whitespace-nowrap">{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
                         <td className="p-2 border whitespace-nowrap">
                           {t.totalSellingPrice > 0 ? (
@@ -157,7 +184,7 @@ export default function ShareableSupplierReport() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={9} className="p-12 text-center text-gray-500 border">
+                      <td colSpan={10} className="p-12 text-center text-gray-500 border">
                         لا توجد عمليات لهذا المورد.
                       </td>
                     </tr>
