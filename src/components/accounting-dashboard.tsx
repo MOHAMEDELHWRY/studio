@@ -16,6 +16,7 @@ import {
   Calendar as CalendarIcon,
   ShoppingCart,
   Users,
+  Factory,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { format } from 'date-fns';
@@ -258,16 +259,19 @@ export default function AccountingDashboard() {
         const supplierTransactions = transactions
             .filter(t => t.supplierName === supplierName);
             
-        const lastTransaction = supplierTransactions.sort((a, b) => b.date.getTime() - a.date.getTime())[0];
+        if (supplierTransactions.length === 0) return acc;
+
+        const sortedForBalance = [...supplierTransactions].sort((a,b) => a.date.getTime() - b.date.getTime());
+        const finalBalanceForSupplier = sortedForBalance.reduce((bal, t) => {
+             return bal + t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+        }, 0);
         
-        if (lastTransaction) {
-            return acc + (transactionBalances[lastTransaction.id] ?? 0);
-        }
-        return acc;
+        return acc + finalBalanceForSupplier;
+
     }, 0);
 
     return { ...stats, totalSuppliersBalance: balance };
-  }, [filteredAndSortedTransactions, transactions, transactionBalances]);
+  }, [filteredAndSortedTransactions, transactions]);
 
   const chartData = useMemo(() => {
     const monthlyData: { [key: string]: { profit: number } } = {};
@@ -287,6 +291,7 @@ export default function AccountingDashboard() {
     const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المورد"];
     
     const escapeCSV = (str: any) => {
+      if (str === null || str === undefined) return "";
       const string = String(str);
       if (string.search(/("|,|\n)/g) >= 0) {
         return `"${string.replace(/"/g, '""')}"`;
@@ -341,9 +346,14 @@ export default function AccountingDashboard() {
         <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
           <BookUser className="w-8 h-8"/> دفتر حسابات الموردين
         </h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-center">
           <Button onClick={() => handleOpenDialog(null)}>
             <Plus className="ml-2 h-4 w-4" /> إضافة عملية
+          </Button>
+           <Button asChild variant="secondary">
+              <Link href="/factory-report">
+                <Factory className="ml-2 h-4 w-4" /> تقرير المصنع
+              </Link>
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={onDialogOpenChange}>
             <DialogContent className="sm:max-w-lg">
