@@ -17,6 +17,8 @@ const loadTransactions = (): Transaction[] => {
     const storedTransactions = JSON.parse(serializedState);
     return storedTransactions.map((t: any) => ({
       ...t,
+      governorate: t.governorate || '',
+      city: t.city || '',
       date: new Date(t.date),
       executionDate: new Date(t.executionDate),
       dueDate: new Date(t.dueDate),
@@ -50,7 +52,11 @@ interface TransactionsContextType {
 const TransactionsContext = createContext<TransactionsContextType | undefined>(undefined);
 
 export function TransactionsProvider({ children }: { children: ReactNode }) {
-  const [transactions, setTransactions] = useState<Transaction[]>(loadTransactions);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    setTransactions(loadTransactions());
+  }, []);
 
   useEffect(() => {
     saveTransactions(transactions);

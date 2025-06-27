@@ -47,12 +47,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { governorates, cities } from '@/data/egypt-governorates';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
   executionDate: z.date({ required_error: 'تاريخ التنفيذ مطلوب.' }),
   dueDate: z.date({ required_error: 'تاريخ الاستحقاق مطلوب.' }),
   supplierName: z.string().min(1, 'اسم المورد مطلوب.'),
+  governorate: z.string().min(1, 'المحافظة مطلوبة.'),
+  city: z.string().min(1, 'المركز مطلوب.'),
   description: z.string().min(1, 'الوصف مطلوب.'),
   type: z.string().min(1, 'النوع مطلوب.'),
   quantity: z.coerce.number().min(1, 'الكمية يجب أن تكون 1 على الأقل.'),
@@ -70,6 +73,7 @@ export default function AccountingDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
   const { toast } = useToast();
 
   const form = useForm<TransactionFormValues>({
@@ -79,6 +83,8 @@ export default function AccountingDashboard() {
       executionDate: new Date(),
       dueDate: new Date(),
       supplierName: "",
+      governorate: "",
+      city: "",
       description: "",
       type: "",
       quantity: 1,
@@ -92,11 +98,16 @@ export default function AccountingDashboard() {
 
   const { watch, setValue } = form;
   const watchedValues = watch();
+  const selectedGovernorate = watch("governorate");
 
   useEffect(() => {
-    const { quantity = 0, purchasePrice = 0, sellingPrice = 0 } = watchedValues;
-    // These are for display only, not part of the form state for submission
-  }, [watchedValues]);
+      if (selectedGovernorate) {
+          setAvailableCities(cities[selectedGovernorate] || []);
+          setValue("city", "", { shouldValidate: false });
+      } else {
+          setAvailableCities([]);
+      }
+  }, [selectedGovernorate, setValue]);
 
 
   const onSubmit = (values: TransactionFormValues) => {
@@ -136,6 +147,8 @@ export default function AccountingDashboard() {
       const searchMatch =
         t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.governorate.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.type.toLowerCase().includes(searchTerm.toLowerCase());
       const dateMatch = dateFilter ? format(t.date, 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd') : true;
       return searchMatch && dateMatch;
@@ -146,7 +159,6 @@ export default function AccountingDashboard() {
     const balances: { [transactionId: string]: number } = {};
     const supplierGroups: { [supplierName: string]: Transaction[] } = {};
 
-    // Group transactions by supplier
     transactions.forEach(t => {
       if (!supplierGroups[t.supplierName]) {
         supplierGroups[t.supplierName] = [];
@@ -154,7 +166,6 @@ export default function AccountingDashboard() {
       supplierGroups[t.supplierName].push(t);
     });
 
-    // Calculate running balance for each supplier
     for (const supplierName in supplierGroups) {
       const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
       let currentBalance = 0;
@@ -211,7 +222,7 @@ export default function AccountingDashboard() {
   }, [filteredAndSortedTransactions]);
 
   const handleExport = () => {
-    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "الوصف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المورد"];
+    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المورد"];
     
     const escapeCSV = (str: any) => {
       const string = String(str);
@@ -228,6 +239,8 @@ export default function AccountingDashboard() {
         format(t.executionDate, 'yyyy-MM-dd'),
         format(t.dueDate, 'yyyy-MM-dd'),
         escapeCSV(t.supplierName),
+        escapeCSV(t.governorate),
+        escapeCSV(t.city),
         escapeCSV(t.description),
         escapeCSV(t.type),
         t.quantity,
@@ -319,6 +332,48 @@ export default function AccountingDashboard() {
                         </FormItem>
                       )}
                     />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <FormField
+                        control={form.control}
+                        name="governorate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>المحافظة</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="اختر المحافظة" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {governorates.map(gov => <SelectItem key={gov} value={gov}>{gov}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>المركز</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={availableCities.length === 0}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="اختر المركز" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {availableCities.map(city => <SelectItem key={city} value={city}>{city}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
@@ -623,6 +678,8 @@ export default function AccountingDashboard() {
                             <TableHead>م</TableHead>
                             <TableHead>التاريخ</TableHead>
                             <TableHead>اسم المورد</TableHead>
+                            <TableHead>المحافظة</TableHead>
+                            <TableHead>المركز</TableHead>
                             <TableHead>الوصف</TableHead>
                             <TableHead>النوع</TableHead>
                             <TableHead>الكمية</TableHead>
@@ -646,6 +703,8 @@ export default function AccountingDashboard() {
                                 <TableCell>
                                     <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
                                 </TableCell>
+                                <TableCell>{t.governorate}</TableCell>
+                                <TableCell>{t.city}</TableCell>
                                 <TableCell>{t.description}</TableCell>
                                 <TableCell>{t.type}</TableCell>
                                 <TableCell>{t.quantity}</TableCell>
@@ -662,7 +721,7 @@ export default function AccountingDashboard() {
                             ))
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={15} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={17} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>

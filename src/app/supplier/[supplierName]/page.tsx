@@ -170,6 +170,8 @@ export default function SupplierReportPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>التاريخ</TableHead>
+                <TableHead>المحافظة</TableHead>
+                <TableHead>المركز</TableHead>
                 <TableHead>الوصف</TableHead>
                 <TableHead>النوع</TableHead>
                 <TableHead>الكمية</TableHead>
@@ -186,6 +188,8 @@ export default function SupplierReportPage() {
                 transactionsWithBalance.map(t => (
                   <TableRow key={t.id}>
                     <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                    <TableCell>{t.governorate}</TableCell>
+                    <TableCell>{t.city}</TableCell>
                     <TableCell className="font-medium">{t.description}</TableCell>
                     <TableCell>{t.type}</TableCell>
                     <TableCell>{t.quantity}</TableCell>
@@ -199,7 +203,7 @@ export default function SupplierReportPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-24 text-center">
+                  <TableCell colSpan={12} className="h-24 text-center">
                     لا توجد عمليات لهذا المورد.
                   </TableCell>
                 </TableRow>
