@@ -19,14 +19,14 @@ const TransactionSchemaForAI = z.object({
   profit: z.number(),
 });
 
-export const PerformanceAnalysisInputSchema = z.object({
+const PerformanceAnalysisInputSchema = z.object({
   transactions: z.array(TransactionSchemaForAI).describe('A list of all financial transactions to be analyzed.'),
   totalProfit: z.number().describe('The total net profit after all expenses.'),
   totalExpenses: z.number().describe('The total amount of all expenses.'),
 });
 export type PerformanceAnalysisInput = z.infer<typeof PerformanceAnalysisInputSchema>;
 
-export const PerformanceAnalysisOutputSchema = z.string().describe('A detailed financial analysis summary in Arabic markdown format.');
+const PerformanceAnalysisOutputSchema = z.string().describe('A detailed financial analysis summary in Arabic markdown format.');
 export type PerformanceAnalysisOutput = z.infer<typeof PerformanceAnalysisOutputSchema>;
 
 export async function analyzePerformance(input: PerformanceAnalysisInput): Promise<PerformanceAnalysisOutput> {
