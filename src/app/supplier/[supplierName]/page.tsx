@@ -22,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Transaction } from '@/types';
 
 export default function SupplierReportPage() {
   const router = useRouter();
@@ -170,6 +171,7 @@ export default function SupplierReportPage() {
               <TableRow>
                 <TableHead>التاريخ</TableHead>
                 <TableHead>الوصف</TableHead>
+                <TableHead>النوع</TableHead>
                 <TableHead>الكمية</TableHead>
                 <TableHead>تاريخ التنفيذ</TableHead>
                 <TableHead>تاريخ الاستحقاق</TableHead>
@@ -185,6 +187,7 @@ export default function SupplierReportPage() {
                   <TableRow key={t.id}>
                     <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                     <TableCell className="font-medium">{t.description}</TableCell>
+                    <TableCell>{t.type}</TableCell>
                     <TableCell>{t.quantity}</TableCell>
                     <TableCell>{format(t.executionDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                     <TableCell>{format(t.dueDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
@@ -196,7 +199,7 @@ export default function SupplierReportPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center">
+                  <TableCell colSpan={10} className="h-24 text-center">
                     لا توجد عمليات لهذا المورد.
                   </TableCell>
                 </TableRow>

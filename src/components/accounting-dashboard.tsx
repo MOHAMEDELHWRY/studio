@@ -39,8 +39,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Textarea } from './ui/textarea';
 import { useTransactions } from '@/context/transactions-context';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -48,6 +54,7 @@ const transactionSchema = z.object({
   dueDate: z.date({ required_error: 'تاريخ الاستحقاق مطلوب.' }),
   supplierName: z.string().min(1, 'اسم المورد مطلوب.'),
   description: z.string().min(1, 'الوصف مطلوب.'),
+  type: z.string().min(1, 'النوع مطلوب.'),
   quantity: z.coerce.number().min(1, 'الكمية يجب أن تكون 1 على الأقل.'),
   purchasePrice: z.coerce.number().min(0, 'سعر الشراء يجب أن يكون موجبًا.'),
   sellingPrice: z.coerce.number().min(0, 'سعر البيع يجب أن يكون موجبًا.'),
@@ -73,6 +80,7 @@ export default function AccountingDashboard() {
       dueDate: new Date(),
       supplierName: "",
       description: "",
+      type: "",
       quantity: 1,
       purchasePrice: 0,
       sellingPrice: 0,
@@ -127,7 +135,8 @@ export default function AccountingDashboard() {
     return transactions.filter(t => {
       const searchMatch =
         t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
+        t.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.type.toLowerCase().includes(searchTerm.toLowerCase());
       const dateMatch = dateFilter ? format(t.date, 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd') : true;
       return searchMatch && dateMatch;
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
@@ -202,7 +211,7 @@ export default function AccountingDashboard() {
   }, [filteredAndSortedTransactions]);
 
   const handleExport = () => {
-    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "الوصف", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المورد"];
+    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "الوصف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المورد"];
     
     const escapeCSV = (str: any) => {
       const string = String(str);
@@ -214,12 +223,13 @@ export default function AccountingDashboard() {
 
     const rows = transactionsForDisplay.map((t, index) =>
       [
-        index + 1,
+        transactionsForDisplay.length - index,
         format(t.date, 'yyyy-MM-dd'),
         format(t.executionDate, 'yyyy-MM-dd'),
         format(t.dueDate, 'yyyy-MM-dd'),
         escapeCSV(t.supplierName),
         escapeCSV(t.description),
+        escapeCSV(t.type),
         t.quantity,
         t.purchasePrice,
         t.totalPurchasePrice,
@@ -310,19 +320,52 @@ export default function AccountingDashboard() {
                       )}
                     />
                   </div>
-                   <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>الوصف / النوع</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="وصف المنتج أو الخدمة" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>الوصف</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="اختر الوصف" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="معبأ">معبأ</SelectItem>
+                              <SelectItem value="سائب">سائب</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>النوع</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="اختر النوع" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="22.5">22.5</SelectItem>
+                              <SelectItem value="32.5">32.5</SelectItem>
+                              <SelectItem value="42.5">42.5</SelectItem>
+                              <SelectItem value="52.5">52.5</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -581,6 +624,8 @@ export default function AccountingDashboard() {
                             <TableHead>التاريخ</TableHead>
                             <TableHead>اسم المورد</TableHead>
                             <TableHead>الوصف</TableHead>
+                            <TableHead>النوع</TableHead>
+                            <TableHead>الكمية</TableHead>
                             <TableHead>تاريخ التنفيذ</TableHead>
                             <TableHead>تاريخ الاستحقاق</TableHead>
                             <TableHead>إجمالي الشراء</TableHead>
@@ -601,10 +646,9 @@ export default function AccountingDashboard() {
                                 <TableCell>
                                     <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
                                 </TableCell>
-                                <TableCell>
-                                    <div className="font-medium">{t.description}</div>
-                                    <div className="text-sm text-muted-foreground">الكمية: {t.quantity}</div>
-                                </TableCell>
+                                <TableCell>{t.description}</TableCell>
+                                <TableCell>{t.type}</TableCell>
+                                <TableCell>{t.quantity}</TableCell>
                                 <TableCell>{format(t.executionDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                                 <TableCell>{format(t.dueDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                                 <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
@@ -618,7 +662,7 @@ export default function AccountingDashboard() {
                             ))
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={13} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={15} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>

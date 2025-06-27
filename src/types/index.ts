@@ -5,6 +5,7 @@ export type Transaction = {
   dueDate: Date;
   supplierName: string;
   description: string;
+  type: string;
   quantity: number;
   purchasePrice: number;
   totalPurchasePrice: number;
