@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { ArrowRight, DollarSign, Package, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowRight, DollarSign, Package, Trash2, TrendingUp, TrendingDown, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,7 +22,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Transaction } from '@/types';
 
 export default function SupplierReportPage() {
   const router = useRouter();
@@ -42,24 +41,28 @@ export default function SupplierReportPage() {
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [transactions, supplierName]);
   
-  const transactionsWithBalance = useMemo(() => {
-    let balance = 0;
+  const transactionsWithBalances = useMemo(() => {
+    let salesBalance = 0;
+    let cashFlowBalance = 0;
     return supplierTransactionsAsc.map(t => {
-      balance += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
-      return { ...t, runningBalance: balance };
+      salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
+      cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
+      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance };
     }).sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [supplierTransactionsAsc]);
 
   const supplierStats = useMemo(() => {
     return supplierTransactionsAsc.reduce((acc, t) => {
       acc.totalPurchases += t.totalPurchasePrice;
-      acc.totalPaid += t.amountPaidToFactory;
-      acc.totalReceived += t.amountReceivedFromSupplier;
+      acc.totalSales += t.totalSellingPrice;
+      acc.totalPaidToFactory += t.amountPaidToFactory;
+      acc.totalReceivedFromSupplier += t.amountReceivedFromSupplier;
       return acc;
-    }, { totalPurchases: 0, totalPaid: 0, totalReceived: 0 });
+    }, { totalPurchases: 0, totalSales: 0, totalPaidToFactory: 0, totalReceivedFromSupplier: 0 });
   }, [supplierTransactionsAsc]);
 
-  const finalBalance = transactionsWithBalance.length > 0 ? transactionsWithBalance[0].runningBalance : 0;
+  const finalSalesBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].salesRunningBalance : 0;
+  const finalCashFlowBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].cashFlowRunningBalance : 0;
   
   const handleDeleteSupplier = () => {
     deleteSupplier(supplierName);
@@ -128,35 +131,37 @@ export default function SupplierReportPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المدفوع للمصنع</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {supplierStats.totalPaid.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المستلم من المورد</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">
-              {supplierStats.totalReceived.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">الرصيد النهائي للمورد</CardTitle>
+            <CardTitle className="text-sm font-medium">إجمالي المبيعات</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${finalBalance > 0 ? 'text-destructive' : 'text-success'}`}>
-              {finalBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+            <div className="text-2xl font-bold">
+              {supplierStats.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">الرصيد النقدي النهائي</CardTitle>
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${finalCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+            </div>
+            <p className="text-xs text-muted-foreground">مستلم من المورد - مدفوع للمصنع</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">الرصيد النهائي (مبيعات)</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+            </div>
+             <p className="text-xs text-muted-foreground">مستلم من المورد - إجمالي البيع</p>
           </CardContent>
         </Card>
       </div>
@@ -170,40 +175,32 @@ export default function SupplierReportPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>التاريخ</TableHead>
-                <TableHead>المحافظة</TableHead>
-                <TableHead>المركز</TableHead>
                 <TableHead>الوصف</TableHead>
-                <TableHead>النوع</TableHead>
-                <TableHead>الكمية</TableHead>
-                <TableHead>تاريخ التنفيذ</TableHead>
-                <TableHead>تاريخ الاستحقاق</TableHead>
                 <TableHead>إجمالي الشراء</TableHead>
+                <TableHead>إجمالي البيع</TableHead>
                 <TableHead>المدفوع للمصنع</TableHead>
                 <TableHead>المستلم من المورد</TableHead>
-                <TableHead>رصيد المورد</TableHead>
+                <TableHead>رصيد المبيعات</TableHead>
+                <TableHead>الرصيد النقدي</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactionsWithBalance.length > 0 ? (
-                transactionsWithBalance.map(t => (
+              {transactionsWithBalances.length > 0 ? (
+                transactionsWithBalances.map(t => (
                   <TableRow key={t.id}>
                     <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
-                    <TableCell>{t.governorate}</TableCell>
-                    <TableCell>{t.city}</TableCell>
                     <TableCell className="font-medium">{t.description}</TableCell>
-                    <TableCell>{t.type}</TableCell>
-                    <TableCell>{t.quantity}</TableCell>
-                    <TableCell>{format(t.executionDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
-                    <TableCell>{format(t.dueDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                     <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                    <TableCell>{t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                    <TableCell className={`font-bold ${t.runningBalance > 0 ? 'text-destructive' : 'text-success'}`}>{t.runningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                    <TableCell className={`font-bold ${t.salesRunningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.salesRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                     <TableCell className={`font-bold ${t.cashFlowRunningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.cashFlowRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={12} className="h-24 text-center">
+                  <TableCell colSpan={8} className="h-24 text-center">
                     لا توجد عمليات لهذا المورد.
                   </TableCell>
                 </TableRow>

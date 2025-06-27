@@ -215,7 +215,7 @@ export default function AccountingDashboard() {
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
   }, [transactions, searchTerm, dateFilter]);
   
-  const transactionBalances = useMemo(() => {
+  const supplierSalesBalances = useMemo(() => {
     const balances: { [transactionId: string]: number } = {};
     const supplierGroups: { [supplierName: string]: Transaction[] } = {};
 
@@ -230,7 +230,29 @@ export default function AccountingDashboard() {
       const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
       let currentBalance = 0;
       for (const t of sortedTransactions) {
-        currentBalance += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+        currentBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
+        balances[t.id] = currentBalance;
+      }
+    }
+    return balances;
+  }, [transactions]);
+  
+  const supplierCashFlowBalances = useMemo(() => {
+    const balances: { [transactionId: string]: number } = {};
+    const supplierGroups: { [supplierName: string]: Transaction[] } = {};
+
+    transactions.forEach(t => {
+      if (!supplierGroups[t.supplierName]) {
+        supplierGroups[t.supplierName] = [];
+      }
+      supplierGroups[t.supplierName].push(t);
+    });
+
+    for (const supplierName in supplierGroups) {
+      const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
+      let currentBalance = 0;
+      for (const t of sortedTransactions) {
+        currentBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
         balances[t.id] = currentBalance;
       }
     }
@@ -240,12 +262,13 @@ export default function AccountingDashboard() {
   const transactionsForDisplay = useMemo(() => {
     return filteredAndSortedTransactions.map(t => ({
       ...t,
-      supplierBalance: transactionBalances[t.id] ?? 0
+      supplierSalesBalance: supplierSalesBalances[t.id] ?? 0,
+      supplierCashFlowBalance: supplierCashFlowBalances[t.id] ?? 0,
     }));
-  }, [filteredAndSortedTransactions, transactionBalances]);
+  }, [filteredAndSortedTransactions, supplierSalesBalances, supplierCashFlowBalances]);
 
 
-  const { totalSales, totalPurchases, totalProfit, totalSuppliersBalance } = useMemo(() => {
+  const { totalSales, totalPurchases, totalProfit, totalSuppliersSalesBalance } = useMemo(() => {
     const stats = filteredAndSortedTransactions.reduce((acc, t) => {
         acc.totalSales += t.totalSellingPrice;
         acc.totalPurchases += t.totalPurchasePrice;
@@ -261,16 +284,15 @@ export default function AccountingDashboard() {
             
         if (supplierTransactions.length === 0) return acc;
 
-        const sortedForBalance = [...supplierTransactions].sort((a,b) => a.date.getTime() - b.date.getTime());
-        const finalBalanceForSupplier = sortedForBalance.reduce((bal, t) => {
-             return bal + t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+        const finalBalanceForSupplier = supplierTransactions.reduce((bal, t) => {
+             return bal + (t.amountReceivedFromSupplier - t.totalSellingPrice);
         }, 0);
         
         return acc + finalBalanceForSupplier;
 
     }, 0);
 
-    return { ...stats, totalSuppliersBalance: balance };
+    return { ...stats, totalSuppliersSalesBalance: balance };
   }, [filteredAndSortedTransactions, transactions]);
 
   const chartData = useMemo(() => {
@@ -288,7 +310,7 @@ export default function AccountingDashboard() {
   }, [filteredAndSortedTransactions]);
 
   const handleExport = () => {
-    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المورد"];
+    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد", "رصيد المبيعات", "الرصيد النقدي"];
     
     const escapeCSV = (str: any) => {
       if (str === null || str === undefined) return "";
@@ -319,7 +341,8 @@ export default function AccountingDashboard() {
         t.profit,
         t.amountPaidToFactory,
         t.amountReceivedFromSupplier,
-        t.supplierBalance
+        t.supplierSalesBalance,
+        t.supplierCashFlowBalance
       ].join(',')
     );
 
@@ -678,13 +701,14 @@ export default function AccountingDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي رصيد الموردين</CardTitle>
+            <CardTitle className="text-sm font-medium">إجمالي أرصدة الموردين</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${totalSuppliersBalance > 0 ? 'text-destructive' : 'text-success'}`}>
-              {totalSuppliersBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+            <div className={`text-2xl font-bold ${totalSuppliersSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {totalSuppliersSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
+             <p className="text-xs text-muted-foreground">على أساس (مستلم - مبيعات)</p>
           </CardContent>
         </Card>
         <Card>
@@ -748,20 +772,13 @@ export default function AccountingDashboard() {
                             <TableHead>م</TableHead>
                             <TableHead>التاريخ</TableHead>
                             <TableHead>اسم المورد</TableHead>
-                            <TableHead>المحافظة</TableHead>
-                            <TableHead>المركز</TableHead>
                             <TableHead>الوصف</TableHead>
-                            <TableHead>النوع</TableHead>
-                            <TableHead>الكمية</TableHead>
-                            <TableHead>تاريخ التنفيذ</TableHead>
-                            <TableHead>تاريخ الاستحقاق</TableHead>
                             <TableHead>إجمالي الشراء</TableHead>
                             <TableHead>إجمالي البيع</TableHead>
-                            <TableHead>الضرائب</TableHead>
-                            <TableHead>الربح</TableHead>
                             <TableHead>المدفوع للمصنع</TableHead>
                             <TableHead>المستلم من المورد</TableHead>
-                            <TableHead>رصيد المورد</TableHead>
+                            <TableHead>رصيد المبيعات</TableHead>
+                             <TableHead>الرصيد النقدي</TableHead>
                             <TableHead>الإجراءات</TableHead>
                         </TableRow>
                         </TableHeader>
@@ -774,20 +791,13 @@ export default function AccountingDashboard() {
                                 <TableCell>
                                     <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
                                 </TableCell>
-                                <TableCell>{t.governorate}</TableCell>
-                                <TableCell>{t.city}</TableCell>
                                 <TableCell>{t.description}</TableCell>
-                                <TableCell>{t.type}</TableCell>
-                                <TableCell>{t.quantity}</TableCell>
-                                <TableCell>{format(t.executionDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
-                                <TableCell>{format(t.dueDate, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                                 <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell>{t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell>{t.taxes.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className={`font-medium ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className={`font-bold ${t.supplierBalance > 0 ? 'text-destructive' : 'text-success'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell className={`font-bold ${t.supplierSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.supplierSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell className={`font-bold ${t.supplierCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.supplierCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell>
                                   <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
                                     <Pencil className="h-4 w-4" />
@@ -798,7 +808,7 @@ export default function AccountingDashboard() {
                             ))
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={18} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={11} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>
