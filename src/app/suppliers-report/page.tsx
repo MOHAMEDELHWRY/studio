@@ -99,14 +99,14 @@ export default function SuppliersReportPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي رصيد المصنع</CardTitle>
+            <CardTitle className="text-sm font-medium">إجمالي رصيد الموردين لدى المصنع</CardTitle>
             <Factory className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
               {totalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
-             <p className="text-xs text-muted-foreground">على أساس (المدفوع - المشتريات)</p>
+             <p className="text-xs text-muted-foreground">على أساس (إجمالي المدفوع للمصنع - إجمالي المشتريات)</p>
           </CardContent>
         </Card>
       </div>
@@ -127,7 +127,7 @@ export default function SuppliersReportPage() {
                 <TableHead>عدد العمليات</TableHead>
                 <TableHead>رصيد المبيعات</TableHead>
                 <TableHead>الرصيد النقدي</TableHead>
-                <TableHead>رصيد المصنع</TableHead>
+                <TableHead>رصيد لدى المصنع</TableHead>
                 <TableHead>إجراءات</TableHead>
               </TableRow>
             </TableHeader>

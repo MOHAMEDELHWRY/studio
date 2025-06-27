@@ -27,10 +27,12 @@ export default function ShareableSupplierReport() {
   const transactionsWithBalances = useMemo(() => {
     let salesBalance = 0;
     let cashFlowBalance = 0;
+    let factoryBalance = 0;
     return supplierTransactionsAsc.map(t => {
       salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
       cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
-      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance };
+      factoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
+      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance, factoryRunningBalance: factoryBalance };
     }).sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [supplierTransactionsAsc]);
 
@@ -46,6 +48,7 @@ export default function ShareableSupplierReport() {
 
   const finalSalesBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].salesRunningBalance : 0;
   const finalCashFlowBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].cashFlowRunningBalance : 0;
+  const finalFactoryBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].factoryRunningBalance : 0;
 
   if (!supplierName) {
     return (
@@ -96,12 +99,16 @@ export default function ShareableSupplierReport() {
                   <p className="text-base sm:text-xl font-bold text-gray-800">{supplierStats.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">رصيد المبيعات النهائي</h3>
+                  <p className={'text-base sm:text-xl font-bold ' + (finalSalesBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
+              </div>
+              <div className="p-2 sm:p-4 border rounded-lg">
                   <h3 className="text-xs sm:text-sm font-medium text-gray-600">الرصيد النقدي النهائي</h3>
                   <p className={'text-base sm:text-xl font-bold ' + (finalCashFlowBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">رصيد المبيعات النهائي</h3>
-                  <p className={'text-base sm:text-xl font-bold ' + (finalSalesBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">رصيد لدى المصنع</h3>
+                  <p className={'text-base sm:text-xl font-bold ' + (finalFactoryBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{finalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
           </div>
         </section>
@@ -120,6 +127,7 @@ export default function ShareableSupplierReport() {
                     <th className="p-2 border font-semibold text-gray-700">المستلم من المورد</th>
                     <th className="p-2 border font-semibold text-gray-700">رصيد المبيعات</th>
                     <th className="p-2 border font-semibold text-gray-700">الرصيد النقدي</th>
+                    <th className="p-2 border font-semibold text-gray-700">رصيد لدى المصنع</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -134,11 +142,12 @@ export default function ShareableSupplierReport() {
                         <td className="p-2 border whitespace-nowrap text-green-600">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
                         <td className={'p-2 border whitespace-nowrap font-bold ' + (t.salesRunningBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{t.salesRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
                         <td className={'p-2 border whitespace-nowrap font-bold ' + (t.cashFlowRunningBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{t.cashFlowRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
+                        <td className={'p-2 border whitespace-nowrap font-bold ' + (t.factoryRunningBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{t.factoryRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={8} className="p-12 text-center text-gray-500 border">
+                      <td colSpan={9} className="p-12 text-center text-gray-500 border">
                         لا توجد عمليات لهذا المورد.
                       </td>
                     </tr>

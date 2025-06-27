@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { ArrowRight, DollarSign, Package, Trash2, TrendingUp, TrendingDown, Briefcase, Share2 } from 'lucide-react';
+import { ArrowRight, DollarSign, Package, Trash2, Factory, Briefcase, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -44,10 +44,12 @@ export default function SupplierReportPage() {
   const transactionsWithBalances = useMemo(() => {
     let salesBalance = 0;
     let cashFlowBalance = 0;
+    let factoryBalance = 0;
     return supplierTransactionsAsc.map(t => {
       salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
       cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
-      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance };
+      factoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
+      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance, factoryRunningBalance: factoryBalance };
     }).sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [supplierTransactionsAsc]);
 
@@ -63,6 +65,7 @@ export default function SupplierReportPage() {
 
   const finalSalesBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].salesRunningBalance : 0;
   const finalCashFlowBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].cashFlowRunningBalance : 0;
+  const finalFactoryBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].factoryRunningBalance : 0;
   
   const handleDeleteSupplier = () => {
     deleteSupplier(supplierName);
@@ -123,7 +126,7 @@ export default function SupplierReportPage() {
         </div>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي المشتريات</CardTitle>
@@ -148,6 +151,18 @@ export default function SupplierReportPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">رصيد المبيعات النهائي</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+            </div>
+             <p className="text-xs text-muted-foreground">(المستلم من المورد) - (إجمالي البيع)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">الرصيد النقدي النهائي</CardTitle>
             <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -160,14 +175,14 @@ export default function SupplierReportPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">رصيد المبيعات النهائي</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">رصيد لدى المصنع</CardTitle>
+            <Factory className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+            <div className={`text-2xl font-bold ${finalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {finalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
-             <p className="text-xs text-muted-foreground">(المستلم من المورد) - (إجمالي البيع)</p>
+            <p className="text-xs text-muted-foreground">(المدفوع للمصنع) - (إجمالي الشراء)</p>
           </CardContent>
         </Card>
       </div>
@@ -188,6 +203,7 @@ export default function SupplierReportPage() {
                 <TableHead>المستلم من المورد</TableHead>
                 <TableHead>رصيد المبيعات</TableHead>
                 <TableHead>الرصيد النقدي</TableHead>
+                <TableHead>رصيد لدى المصنع</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -202,11 +218,12 @@ export default function SupplierReportPage() {
                     <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     <TableCell className={`font-bold ${t.salesRunningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.salesRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                      <TableCell className={`font-bold ${t.cashFlowRunningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.cashFlowRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                     <TableCell className={`font-bold ${t.factoryRunningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.factoryRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
+                  <TableCell colSpan={9} className="h-24 text-center">
                     لا توجد عمليات لهذا المورد.
                   </TableCell>
                 </TableRow>
