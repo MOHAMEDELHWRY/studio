@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -6,7 +7,7 @@ import { useTransactions } from '@/context/transactions-context';
 import { governorates } from '@/data/egypt-governorates';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
+import { Bar, ComposedChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Line } from 'recharts';
 import { ArrowRight, DollarSign, LineChart } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -46,7 +47,7 @@ export default function ReportsPage() {
         key = 'governorate';
     }
 
-    const dataMap = new Map<string, { name: string, totalSales: number, totalProfit: number, count: number }>();
+    const dataMap = new Map<string, { name: string, totalSales: number, totalProfit: number, count: number, profitPercentage: number }>();
 
     filteredTransactions.forEach(t => {
       let groupName: string;
@@ -58,13 +59,18 @@ export default function ReportsPage() {
       }
 
       if (!dataMap.has(groupName)) {
-        dataMap.set(groupName, { name: groupName, totalSales: 0, totalProfit: 0, count: 0 });
+        dataMap.set(groupName, { name: groupName, totalSales: 0, totalProfit: 0, count: 0, profitPercentage: 0 });
       }
       const current = dataMap.get(groupName)!;
       current.totalSales += t.totalSellingPrice;
       current.totalProfit += t.profit;
       current.count += 1;
     });
+    
+    // Calculate percentage after aggregation
+    for (const value of dataMap.values()) {
+        value.profitPercentage = value.totalSales > 0 ? (value.totalProfit / value.totalSales) * 100 : 0;
+    }
 
     const sortedData = Array.from(dataMap.values()).sort((a, b) => b.totalSales - a.totalSales);
     return { chartData: sortedData, tableData: sortedData, groupingKey: key };
@@ -169,22 +175,32 @@ export default function ReportsPage() {
         <CardContent>
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={chartData} margin={{ top: 5, right: 20, left: 50, bottom: 60 }}>
+              <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 50, bottom: 60 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} />
                 <YAxis yAxisId="left" orientation="left" stroke="hsl(var(--primary))" tickFormatter={(value) => new Intl.NumberFormat('ar-EG', { notation: 'compact' }).format(value as number)} />
-                <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--success))" tickFormatter={(value) => new Intl.NumberFormat('ar-EG', { notation: 'compact' }).format(value as number)} />
+                <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--accent))" tickFormatter={(value) => `${Math.round(value as number)}%`} />
                 <Tooltip
-                  formatter={(value, name) => [
-                    (value as number).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }),
-                    name === 'totalSales' ? 'المبيعات' : 'الأرباح'
-                  ]}
+                  formatter={(value, name) => {
+                    if (name === 'profitPercentage') {
+                      return [`${(value as number).toFixed(2)}%`, 'نسبة الربح'];
+                    }
+                    return [
+                      (value as number).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }),
+                      name === 'totalSales' ? 'المبيعات' : 'الأرباح'
+                    ]
+                  }}
                   cursor={{ fill: 'hsl(var(--muted))' }}
                 />
-                <Legend verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} payload={[ { value: 'المبيعات', type: 'square', id: 'totalSales', color: 'hsl(var(--primary))' }, { value: 'الأرباح', type: 'square', id: 'totalProfit', color: 'hsl(var(--success))' } ]} />
+                <Legend verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} payload={[
+                    { value: 'المبيعات', type: 'square', id: 'totalSales', color: 'hsl(var(--primary))' },
+                    { value: 'الأرباح', type: 'square', id: 'totalProfit', color: 'hsl(var(--success))' },
+                    { value: 'نسبة الربح', type: 'line', id: 'profitPercentage', color: 'hsl(var(--accent))' }
+                ]} />
                 <Bar yAxisId="left" dataKey="totalSales" fill="hsl(var(--primary))" name="المبيعات" radius={[4, 4, 0, 0]} />
-                <Bar yAxisId="right" dataKey="totalProfit" fill="hsl(var(--success))" name="الأرباح" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                <Bar yAxisId="left" dataKey="totalProfit" fill="hsl(var(--success))" name="الأرباح" radius={[4, 4, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="profitPercentage" name="نسبة الربح" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+              </ComposedChart>
             </ResponsiveContainer>
           ) : (
              <div className="h-96 flex items-center justify-center text-muted-foreground">لا توجد بيانات لعرضها.</div>
@@ -203,6 +219,7 @@ export default function ReportsPage() {
                 <TableHead>{getGroupingKeyHeader()}</TableHead>
                 <TableHead>إجمالي المبيعات</TableHead>
                 <TableHead>صافي الربح</TableHead>
+                <TableHead>نسبة الربح</TableHead>
                 <TableHead>عدد العمليات</TableHead>
               </TableRow>
             </TableHeader>
@@ -215,12 +232,15 @@ export default function ReportsPage() {
                     <TableCell className={item.totalProfit >= 0 ? 'text-success' : 'text-destructive'}>
                         {item.totalProfit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
                     </TableCell>
+                    <TableCell>
+                      {`${item.profitPercentage.toFixed(1)}%`}
+                    </TableCell>
                     <TableCell>{item.count}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     لا توجد بيانات تطابق الفلتر المحدد.
                   </TableCell>
                 </TableRow>
