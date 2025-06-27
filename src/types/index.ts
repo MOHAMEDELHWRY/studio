@@ -1,13 +1,13 @@
 export type Transaction = {
   id: string;
   date: Date;
-  executionDate: Date;
-  dueDate: Date;
+  executionDate?: Date;
+  dueDate?: Date;
   supplierName: string;
-  governorate: string;
-  city: string;
+  governorate?: string;
+  city?: string;
   description: string;
-  type: string;
+  type?: string;
   quantity: number;
   purchasePrice: number;
   totalPurchasePrice: number;

@@ -71,16 +71,16 @@ import { analyzePerformance, PerformanceAnalysisOutput } from '@/ai/flows/analyz
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
-  executionDate: z.date({ required_error: 'تاريخ التنفيذ مطلوب.' }),
-  dueDate: z.date({ required_error: 'تاريخ الاستحقاق مطلوب.' }),
+  executionDate: z.date().optional(),
+  dueDate: z.date().optional(),
   supplierName: z.string().trim().min(1, 'اسم المورد مطلوب.'),
-  governorate: z.string().min(1, 'المحافظة مطلوبة.'),
+  governorate: z.string().optional(),
   city: z.string().optional(),
-  description: z.string().min(1, 'الوصف مطلوب.'),
-  type: z.string().min(1, 'النوع مطلوب.'),
-  quantity: z.coerce.number().min(1, 'الكمية يجب أن تكون 1 على الأقل.'),
-  purchasePrice: z.coerce.number().min(0, 'سعر الشراء يجب أن يكون موجبًا.'),
-  sellingPrice: z.coerce.number().min(0, 'سعر البيع يجب أن يكون موجبًا.'),
+  description: z.string().trim().min(1, 'الوصف مطلوب.'),
+  type: z.string().optional(),
+  quantity: z.coerce.number().min(0, 'الكمية يجب أن تكون موجبة.').default(0),
+  purchasePrice: z.coerce.number().min(0, 'سعر الشراء يجب أن يكون موجبًا.').default(0),
+  sellingPrice: z.coerce.number().min(0, 'سعر البيع يجب أن يكون موجبًا.').default(0),
   taxes: z.coerce.number().min(0, 'الضرائب يجب أن تكون موجبة.').default(0),
   amountPaidToFactory: z.coerce.number().min(0, 'المبلغ المدفوع يجب أن يكون موجبًا.').default(0),
   amountReceivedFromSupplier: z.coerce.number().min(0, 'المبلغ المستلم يجب أن يكون موجبًا.').default(0),
@@ -126,7 +126,7 @@ export default function AccountingDashboard() {
       city: "",
       description: "",
       type: "",
-      quantity: 1,
+      quantity: 0,
       purchasePrice: 0,
       sellingPrice: 0,
       taxes: 0,
@@ -164,8 +164,8 @@ export default function AccountingDashboard() {
       form.reset({
         ...transaction,
         date: new Date(transaction.date),
-        executionDate: new Date(transaction.executionDate),
-        dueDate: new Date(transaction.dueDate),
+        executionDate: transaction.executionDate ? new Date(transaction.executionDate) : undefined,
+        dueDate: transaction.dueDate ? new Date(transaction.dueDate) : undefined,
       });
        if (transaction.governorate) {
         setAvailableCities(cities[transaction.governorate] || []);
@@ -180,7 +180,7 @@ export default function AccountingDashboard() {
         city: "",
         description: "",
         type: "",
-        quantity: 1,
+        quantity: 0,
         purchasePrice: 0,
         sellingPrice: 0,
         taxes: 0,
@@ -225,18 +225,21 @@ export default function AccountingDashboard() {
 
   const onSubmit = async (values: TransactionFormValues) => {
     try {
-        const totalPurchasePrice = values.quantity * values.purchasePrice;
-        const totalSellingPrice = values.quantity * values.sellingPrice;
-        const profit = totalSellingPrice - totalPurchasePrice - values.taxes;
+        const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
+        const totalSellingPrice = (values.quantity || 0) * (values.sellingPrice || 0);
+        const profit = totalSellingPrice - totalPurchasePrice - (values.taxes || 0);
 
+        const transactionData = {
+          ...values,
+          totalPurchasePrice,
+          totalSellingPrice,
+          profit,
+        };
+        
         if (editingTransaction) {
             const updatedTransaction: Transaction = {
               ...editingTransaction,
-              ...values,
-              city: values.city ?? "",
-              totalPurchasePrice,
-              totalSellingPrice,
-              profit,
+              ...transactionData,
             };
             await updateTransaction(updatedTransaction);
             toast({
@@ -246,14 +249,11 @@ export default function AccountingDashboard() {
             });
         } else {
             const newTransaction: Omit<Transaction, 'id'> = {
-              ...values,
-              city: values.city ?? "",
-              totalPurchasePrice,
-              totalSellingPrice,
-              profit,
+              ...transactionData,
+              executionDate: transactionData.executionDate || transactionData.date,
+              dueDate: transactionData.dueDate || transactionData.date,
             };
-            
-            await addTransaction(newTransaction);
+            await addTransaction(newTransaction as Transaction);
             toast({
               title: "نجاح",
               description: "تمت إضافة العملية بنجاح.",
@@ -263,6 +263,7 @@ export default function AccountingDashboard() {
         form.reset();
         setIsDialogOpen(false);
     } catch (error) {
+        console.error("Error submitting form", error)
         toast({
             title: "خطأ في الإدخال",
             description: "حدث خطأ أثناء حفظ العملية. يرجى مراجعة البيانات المدخلة والمحاولة مرة أخرى.",
@@ -297,9 +298,9 @@ export default function AccountingDashboard() {
       const searchMatch =
         t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.governorate.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.governorate && t.governorate.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (t.city && t.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        t.type.toLowerCase().includes(searchTerm.toLowerCase());
+        (t.type && t.type.toLowerCase().includes(searchTerm.toLowerCase()));
       const dateMatch = dateFilter ? format(t.date, 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd') : true;
       return searchMatch && dateMatch;
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
@@ -359,8 +360,8 @@ export default function AccountingDashboard() {
       [
         filteredAndSortedTransactions.length - index,
         format(t.date, 'yyyy-MM-dd'),
-        format(t.executionDate, 'yyyy-MM-dd'),
-        format(t.dueDate, 'yyyy-MM-dd'),
+        t.executionDate ? format(t.executionDate, 'yyyy-MM-dd') : '',
+        t.dueDate ? format(t.dueDate, 'yyyy-MM-dd') : '',
         escapeCSV(t.supplierName),
         escapeCSV(t.governorate),
         escapeCSV(t.city),
@@ -409,8 +410,8 @@ export default function AccountingDashboard() {
         transactions: transactions.map(t => ({
           date: t.date.toISOString(),
           supplierName: t.supplierName,
-          governorate: t.governorate,
-          city: t.city,
+          governorate: t.governorate || '',
+          city: t.city || '',
           totalSellingPrice: t.totalSellingPrice,
           profit: t.profit,
         })),
@@ -568,7 +569,7 @@ export default function AccountingDashboard() {
                               name="governorate"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>المحافظة</FormLabel>
+                                  <FormLabel>المحافظة (اختياري)</FormLabel>
                                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl>
                                       <SelectTrigger>
@@ -589,7 +590,7 @@ export default function AccountingDashboard() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>المركز (اختياري)</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value} disabled={availableCities.length === 0}>
+                                  <Select onValueChange={field.onChange} value={field.value} disabled={!availableCities.length}>
                                     <FormControl>
                                       <SelectTrigger>
                                         <SelectValue placeholder="اختر المركز" />
@@ -607,7 +608,7 @@ export default function AccountingDashboard() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-2">
-                      <AccordionTrigger>تفاصيل البضاعة والتسعير</AccordionTrigger>
+                      <AccordionTrigger>تفاصيل البضاعة والتسعير (اختياري)</AccordionTrigger>
                       <AccordionContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                           <FormField
@@ -616,17 +617,9 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>الوصف</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="اختر الوصف" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="معبأ">معبأ</SelectItem>
-                                    <SelectItem value="سائب">سائب</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <FormControl>
+                                  <Input placeholder="مثال: دفعة من الحساب أو نوع البضاعة" {...field} />
+                                </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -635,21 +628,11 @@ export default function AccountingDashboard() {
                             control={form.control}
                             name="type"
                             render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>النوع</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="اختر النوع" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="22.5">22.5</SelectItem>
-                                    <SelectItem value="32.5">32.5</SelectItem>
-                                    <SelectItem value="42.5">42.5</SelectItem>
-                                    <SelectItem value="52.5">52.5</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                               <FormItem>
+                                <FormLabel>النوع (اختياري)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="مثال: 42.5" {...field} />
+                                </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -711,20 +694,20 @@ export default function AccountingDashboard() {
                            <FormItem>
                               <FormLabel>إجمالي سعر الشراء</FormLabel>
                               <FormControl>
-                                <Input type="number" value={totalPurchasePriceDisplay} readOnly className="font-bold bg-muted" />
+                                <Input type="number" value={totalPurchasePriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" />
                               </FormControl>
                             </FormItem>
                             <FormItem>
                               <FormLabel>إجمالي سعر البيع</FormLabel>
                               <FormControl>
-                                <Input type="number" value={totalSellingPriceDisplay} readOnly className="font-bold bg-muted" />
+                                <Input type="number" value={totalSellingPriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" />
                               </FormControl>
                             </FormItem>
                         </div>
                         <FormItem className="mt-4">
                             <FormLabel>صافي الربح</FormLabel>
                             <FormControl>
-                              <Input type="number" value={profitDisplay} readOnly className="font-bold bg-muted" />
+                              <Input type="number" value={profitDisplay.toFixed(2)} readOnly className={`font-bold ${profitDisplay >= 0 ? 'bg-success/20' : 'bg-destructive/20'}`} />
                             </FormControl>
                           </FormItem>
                       </AccordionContent>
@@ -764,7 +747,7 @@ export default function AccountingDashboard() {
                             name="executionDate"
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
-                                <FormLabel>تاريخ التنفيذ</FormLabel>
+                                <FormLabel>تاريخ التنفيذ (اختياري)</FormLabel>
                                 <Popover open={isExecDatePopoverOpen} onOpenChange={setIsExecDatePopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
@@ -798,7 +781,7 @@ export default function AccountingDashboard() {
                             name="dueDate"
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
-                                <FormLabel>تاريخ الاستحقاق</FormLabel>
+                                <FormLabel>تاريخ الاستحقاق (اختياري)</FormLabel>
                                 <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <FormControl>

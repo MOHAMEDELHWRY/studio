@@ -59,8 +59,8 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
             ...data,
             id: doc.id,
             date: new Date(data.date),
-            executionDate: new Date(data.executionDate),
-            dueDate: new Date(data.dueDate),
+            executionDate: data.executionDate ? new Date(data.executionDate) : undefined,
+            dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
           } as Transaction;
         });
         setTransactions(fetchedTransactions.sort((a, b) => b.date.getTime() - a.date.getTime()));
@@ -96,8 +96,8 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const docData = {
         ...transaction,
         date: transaction.date.toISOString(),
-        executionDate: transaction.executionDate.toISOString(),
-        dueDate: transaction.dueDate.toISOString(),
+        executionDate: transaction.executionDate?.toISOString(),
+        dueDate: transaction.dueDate?.toISOString(),
       };
       const docRef = await addDoc(transactionsCollectionRef, docData);
       setTransactions(prev => [{ ...transaction, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
@@ -115,10 +115,10 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const docData = {
         ...dataToUpdate,
         date: updatedTransaction.date.toISOString(),
-        executionDate: updatedTransaction.executionDate.toISOString(),
-        dueDate: updatedTransaction.dueDate.toISOString(),
+        executionDate: updatedTransaction.executionDate?.toISOString(),
+        dueDate: updatedTransaction.dueDate?.toISOString(),
       };
-      await updateDoc(transactionDoc, docData);
+      await updateDoc(transactionDoc, docData as any);
       setTransactions(prev => 
         prev.map(t => (t.id === updatedTransaction.id ? updatedTransaction : t))
            .sort((a, b) => b.date.getTime() - a.date.getTime())
