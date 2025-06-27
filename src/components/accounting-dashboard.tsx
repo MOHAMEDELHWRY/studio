@@ -55,7 +55,7 @@ const transactionSchema = z.object({
   dueDate: z.date({ required_error: 'تاريخ الاستحقاق مطلوب.' }),
   supplierName: z.string().min(1, 'اسم المورد مطلوب.'),
   governorate: z.string().min(1, 'المحافظة مطلوبة.'),
-  city: z.string(),
+  city: z.string().optional(),
   description: z.string().min(1, 'الوصف مطلوب.'),
   type: z.string().min(1, 'النوع مطلوب.'),
   quantity: z.coerce.number().min(1, 'الكمية يجب أن تكون 1 على الأقل.'),
@@ -162,6 +162,7 @@ export default function AccountingDashboard() {
             const updatedTransaction: Transaction = {
               ...editingTransaction,
               ...values,
+              city: values.city ?? "",
               totalPurchasePrice,
               totalSellingPrice,
               profit,
@@ -176,6 +177,7 @@ export default function AccountingDashboard() {
             const newTransaction: Transaction = {
               id: new Date().toISOString(),
               ...values,
+              city: values.city ?? "",
               totalPurchasePrice,
               totalSellingPrice,
               profit,
@@ -227,7 +229,7 @@ export default function AccountingDashboard() {
       const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
       let currentBalance = 0;
       for (const t of sortedTransactions) {
-        currentBalance += t.amountReceivedFromSupplier + t.amountPaidToFactory - t.totalPurchasePrice;
+        currentBalance += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
         balances[t.id] = currentBalance;
       }
     }
@@ -253,16 +255,19 @@ export default function AccountingDashboard() {
     const suppliersInFilter = [...new Set(filteredAndSortedTransactions.map(t => t.supplierName))];
     
     const balance = suppliersInFilter.reduce((acc, supplierName) => {
-        const supplierTotalBalance = transactions
-            .filter(t => t.supplierName === supplierName)
-            .reduce((balance, t) => {
-                return balance + t.amountReceivedFromSupplier + t.amountPaidToFactory - t.totalPurchasePrice;
-            }, 0);
-        return acc + supplierTotalBalance;
+        const supplierTransactions = transactions
+            .filter(t => t.supplierName === supplierName);
+            
+        const lastTransaction = supplierTransactions.sort((a, b) => b.date.getTime() - a.date.getTime())[0];
+        
+        if (lastTransaction) {
+            return acc + (transactionBalances[lastTransaction.id] ?? 0);
+        }
+        return acc;
     }, 0);
 
     return { ...stats, totalSuppliersBalance: balance };
-  }, [filteredAndSortedTransactions, transactions]);
+  }, [filteredAndSortedTransactions, transactions, transactionBalances]);
 
   const chartData = useMemo(() => {
     const monthlyData: { [key: string]: { profit: number } } = {};
@@ -414,7 +419,7 @@ export default function AccountingDashboard() {
                         name="city"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>المركز</FormLabel>
+                            <FormLabel>المركز (اختياري)</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value} disabled={availableCities.length === 0}>
                               <FormControl>
                                 <SelectTrigger>
@@ -667,7 +672,7 @@ export default function AccountingDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${totalSuppliersBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <div className={`text-2xl font-bold ${totalSuppliersBalance > 0 ? 'text-destructive' : 'text-success'}`}>
               {totalSuppliersBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
           </CardContent>
@@ -772,7 +777,7 @@ export default function AccountingDashboard() {
                                 <TableCell className={`font-medium ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className={`font-bold ${t.supplierBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell className={`font-bold ${t.supplierBalance > 0 ? 'text-destructive' : 'text-success'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell>
                                   <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
                                     <Pencil className="h-4 w-4" />

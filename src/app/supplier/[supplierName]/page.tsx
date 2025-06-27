@@ -45,9 +45,9 @@ export default function SupplierReportPage() {
   const transactionsWithBalance = useMemo(() => {
     let balance = 0;
     return supplierTransactionsAsc.map(t => {
-      balance += t.amountReceivedFromSupplier + t.amountPaidToFactory - t.totalPurchasePrice;
+      balance += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
       return { ...t, runningBalance: balance };
-    }).sort((a, b) => b.date.getTime() - a.date.getTime()); // Newest first for display
+    }).sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [supplierTransactionsAsc]);
 
   const supplierStats = useMemo(() => {
@@ -154,7 +154,7 @@ export default function SupplierReportPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${finalBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <div className={`text-2xl font-bold ${finalBalance > 0 ? 'text-destructive' : 'text-success'}`}>
               {finalBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
           </CardContent>
@@ -198,7 +198,7 @@ export default function SupplierReportPage() {
                     <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                    <TableCell className={`font-bold ${t.runningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.runningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                    <TableCell className={`font-bold ${t.runningBalance > 0 ? 'text-destructive' : 'text-success'}`}>{t.runningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                   </TableRow>
                 ))
               ) : (
