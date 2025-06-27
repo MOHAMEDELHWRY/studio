@@ -86,54 +86,60 @@ export default function AccountingDashboard() {
         const totalSellingPrice = quantity * sellingPrice;
         const profit = totalSellingPrice - totalPurchasePrice - taxes;
         
-        form.setValue("totalPurchasePrice", totalPurchasePrice, { shouldValidate: true });
-        form.setValue("totalSellingPrice", totalSellingPrice, { shouldValidate: true });
-        form.setValue("profit", profit, { shouldValidate: true });
+        form.setValue("totalPurchasePrice", totalPurchasePrice);
+        form.setValue("totalSellingPrice", totalSellingPrice);
+        form.setValue("profit", profit);
     });
     return () => subscription.unsubscribe();
   }, [form]);
 
   const onSubmit = (values: z.infer<typeof transactionSchema>) => {
-    // Re-calculate derived values here to ensure they are correct upon submission
-    const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
-    const totalSellingPrice = (values.quantity || 0) * (values.sellingPrice || 0);
-    const profit = totalSellingPrice - totalPurchasePrice - (values.taxes || 0);
+    try {
+        const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
+        const totalSellingPrice = (values.quantity || 0) * (values.sellingPrice || 0);
+        const profit = totalSellingPrice - totalPurchasePrice - (values.taxes || 0);
 
-    const newTransaction: Transaction = {
-      id: new Date().toISOString(),
-      date: values.date,
-      supplierName: values.supplierName,
-      description: values.description,
-      quantity: values.quantity,
-      purchasePrice: values.purchasePrice,
-      sellingPrice: values.sellingPrice,
-      taxes: values.taxes || 0,
-      amountPaidToFactory: values.amountPaidToFactory || 0,
-      amountReceivedFromSupplier: values.amountReceivedFromSupplier || 0,
-      totalPurchasePrice: totalPurchasePrice,
-      totalSellingPrice: totalSellingPrice,
-      profit: profit,
-    };
-    
-    addTransaction(newTransaction);
-    toast({
-      title: "نجاح",
-      description: "تمت إضافة العملية بنجاح.",
-    });
+        const newTransaction: Transaction = {
+          id: new Date().toISOString(),
+          date: values.date,
+          supplierName: values.supplierName,
+          description: values.description,
+          quantity: values.quantity,
+          purchasePrice: values.purchasePrice,
+          sellingPrice: values.sellingPrice,
+          taxes: values.taxes || 0,
+          amountPaidToFactory: values.amountPaidToFactory || 0,
+          amountReceivedFromSupplier: values.amountReceivedFromSupplier || 0,
+          totalPurchasePrice: totalPurchasePrice,
+          totalSellingPrice: totalSellingPrice,
+          profit: profit,
+        };
+        
+        addTransaction(newTransaction);
+        toast({
+          title: "نجاح",
+          description: "تمت إضافة العملية بنجاح.",
+        });
 
-    // Reset the form with clean default values
-    form.reset({
-      date: new Date(),
-      supplierName: "",
-      description: "",
-      quantity: 1,
-      purchasePrice: 0,
-      sellingPrice: 0,
-      taxes: 0,
-      amountPaidToFactory: 0,
-      amountReceivedFromSupplier: 0,
-    });
-    setIsDialogOpen(false);
+        form.reset({
+          date: new Date(),
+          supplierName: "",
+          description: "",
+          quantity: 1,
+          purchasePrice: 0,
+          sellingPrice: 0,
+          taxes: 0,
+          amountPaidToFactory: 0,
+          amountReceivedFromSupplier: 0,
+        });
+        setIsDialogOpen(false);
+    } catch (error) {
+        toast({
+            title: "خطأ في الإدخال",
+            description: "حدث خطأ أثناء حفظ العملية. يرجى مراجعة البيانات المدخلة والمحاولة مرة أخرى.",
+            variant: "destructive",
+        });
+    }
   };
 
   const filteredAndSortedTransactions = useMemo(() => {
@@ -146,18 +152,27 @@ export default function AccountingDashboard() {
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
   }, [transactions, searchTerm, dateFilter]);
 
-  const transactionsForDisplay = useMemo(() => {
-    return filteredAndSortedTransactions.map(t => {
-        const allSupplierTransactionsForBalance = transactions
-            .filter(item => item.supplierName === t.supplierName && item.date <= t.date);
+  const supplierBalances = useMemo(() => {
+    const balances: { [key: string]: number } = {};
+    const sortedTransactions = [...transactions].sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    const supplierFinalBalances: { [key: string]: number } = {};
 
-        const balance = allSupplierTransactionsForBalance.reduce((acc, current) => {
-            return acc + current.totalPurchasePrice - current.amountPaidToFactory - current.amountReceivedFromSupplier;
-        }, 0);
-        
-        return { ...t, supplierBalance: balance };
-      });
-  }, [filteredAndSortedTransactions, transactions]);
+    for (const t of sortedTransactions) {
+      const balanceChange = t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
+      balances[t.supplierName] = (balances[t.supplierName] || 0) + balanceChange;
+      supplierFinalBalances[t.id] = balances[t.supplierName];
+    }
+    return supplierFinalBalances;
+  }, [transactions]);
+  
+  const transactionsForDisplay = useMemo(() => {
+    return filteredAndSortedTransactions.map(t => ({
+      ...t,
+      supplierBalance: supplierBalances[t.id] || 0
+    }));
+  }, [filteredAndSortedTransactions, supplierBalances]);
+
 
   const { totalSales, totalPurchases, totalProfit } = useMemo(() => {
     return filteredAndSortedTransactions.reduce((acc, t) => {
@@ -538,7 +553,7 @@ export default function AccountingDashboard() {
                                 <TableCell className={`font-medium ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                                <TableCell className={`font-bold ${t.supplierBalance > 0 ? 'text-destructive' : 'text-success'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell className={`font-bold ${t.supplierBalance >= 0 ? 'text-destructive' : 'text-success'}`}>{t.supplierBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 </TableRow>
                             ))
                         ) : (
