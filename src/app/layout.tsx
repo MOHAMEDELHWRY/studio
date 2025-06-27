@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import { TransactionsProvider } from '@/context/transactions-context';
+import { MainLayout } from '@/components/main-layout';
 
 export const metadata: Metadata = {
   title: 'دفتر حساباتي',
@@ -22,9 +23,11 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <TransactionsProvider>
-          {children}
+          <MainLayout>
+            {children}
+          </MainLayout>
+          <Toaster />
         </TransactionsProvider>
-        <Toaster />
       </body>
     </html>
   );

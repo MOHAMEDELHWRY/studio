@@ -2,14 +2,13 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { governorates } from '@/data/egypt-governorates';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { type DateRange } from 'react-day-picker';
 import { Bar, ComposedChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Line } from 'recharts';
-import { ArrowRight, DollarSign, LineChart, Calendar as CalendarIcon } from 'lucide-react';
+import { DollarSign, LineChart, Calendar as CalendarIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export default function ReportsPage() {
   const { transactions } = useTransactions();
@@ -115,16 +115,15 @@ export default function ReportsPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
-        <h1 className="text-xl md:text-3xl font-bold text-primary flex items-center gap-2">
-          <LineChart className="w-8 h-8" />
-          تقارير المبيعات والأرباح {reportTitle}
-        </h1>
-        <Button asChild variant="outline">
-          <Link href="/">
-            <ArrowRight className="ml-2 h-4 w-4" /> العودة للوحة التحكم
-          </Link>
-        </Button>
+      <header className="flex items-center justify-between mb-8 flex-wrap gap-4">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger />
+          <h1 className="text-xl md:text-3xl font-bold text-primary flex items-center gap-2">
+            <LineChart className="w-8 h-8" />
+            تقارير المبيعات والأرباح
+          </h1>
+        </div>
+        <span className="text-muted-foreground text-sm truncate">{reportTitle}</span>
       </header>
       
       <Card className="mb-8">
@@ -308,5 +307,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    

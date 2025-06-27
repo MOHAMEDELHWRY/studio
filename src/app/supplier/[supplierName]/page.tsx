@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { ArrowRight, DollarSign, Package, Trash2, Factory, Briefcase, Share2, Landmark, PackageCheck, Warehouse, FileText } from 'lucide-react';
+import { DollarSign, Package, Trash2, Factory, Briefcase, Share2, Landmark, PackageCheck, Warehouse, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export default function SupplierReportPage() {
   const router = useRouter();
@@ -102,7 +103,10 @@ export default function SupplierReportPage() {
   return (
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
-        <h1 className="text-3xl font-bold text-primary">تقرير المورد: {supplierName}</h1>
+        <div className="flex items-center gap-4">
+          <SidebarTrigger />
+          <h1 className="text-3xl font-bold text-primary">تقرير المورد: {supplierName}</h1>
+        </div>
         <div className="flex gap-2 flex-wrap">
            <Button asChild variant="outline">
               <Link href={`/share/supplier/${encodeURIComponent(supplierName)}`} target="_blank" rel="noopener noreferrer">
@@ -137,11 +141,6 @@ export default function SupplierReportPage() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          <Button asChild variant="outline">
-            <Link href="/">
-               <ArrowRight className="ml-2 h-4 w-4" /> العودة للوحة التحكم
-            </Link>
-          </Button>
         </div>
       </header>
 

@@ -3,12 +3,13 @@
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
-import { ArrowRight, Users, Factory, Share2, FileText } from 'lucide-react';
+import { Users, Factory, Share2, FileText } from 'lucide-react';
 import { type Transaction } from '@/types';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 interface SupplierSummary {
   supplierName: string;
@@ -75,16 +76,12 @@ export default function SuppliersReportPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
+      <header className="flex items-center mb-8 gap-4">
+        <SidebarTrigger />
         <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
           <Users className="w-8 h-8" />
           تقرير الموردين
         </h1>
-        <Button asChild variant="outline">
-          <Link href="/">
-            <ArrowRight className="ml-2 h-4 w-4" /> العودة للوحة التحكم
-          </Link>
-        </Button>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">

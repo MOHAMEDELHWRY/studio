@@ -4,11 +4,12 @@ import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTransactions } from '@/context/transactions-context';
-import { ArrowRight, Factory, DollarSign } from 'lucide-react';
+import { Factory, DollarSign } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 interface SupplierBalance {
   supplierName: string;
@@ -51,16 +52,12 @@ export default function FactoryReportPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
+      <header className="flex items-center mb-8 gap-4">
+        <SidebarTrigger />
         <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
           <Factory className="w-8 h-8" />
           تقرير أرصدة المصنع
         </h1>
-        <Button asChild variant="outline">
-          <Link href="/">
-            <ArrowRight className="ml-2 h-4 w-4" /> العودة للوحة التحكم
-          </Link>
-        </Button>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">

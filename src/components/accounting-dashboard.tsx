@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
 import {
-  BookUser,
   DollarSign,
   Download,
   Pencil,
@@ -16,7 +15,6 @@ import {
   Calendar as CalendarIcon,
   ShoppingCart,
   Users,
-  Factory,
   MinusCircle,
   Wallet,
   Trash2,
@@ -63,6 +61,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { SidebarTrigger } from './ui/sidebar';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -384,10 +383,13 @@ export default function AccountingDashboard() {
   
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-        <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
-          <BookUser className="w-8 h-8"/> دفتر حسابات الموردين
-        </h1>
+      <header className="flex items-center justify-between mb-8 gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger />
+          <h1 className="text-3xl font-bold text-primary">
+            لوحة التحكم
+          </h1>
+        </div>
         <div className="flex gap-2 flex-wrap justify-center">
           <Button onClick={() => handleOpenDialog(null)}>
             <Plus className="ml-2 h-4 w-4" /> إضافة عملية
@@ -395,22 +397,13 @@ export default function AccountingDashboard() {
            <Button variant="outline" onClick={() => handleOpenExpenseDialog(null)}>
             <MinusCircle className="ml-2 h-4 w-4" /> إضافة مصروف
           </Button>
-           <Button asChild variant="secondary">
-              <Link href="/suppliers-report">
-                <Users className="ml-2 h-4 w-4" /> تقرير الموردين
-              </Link>
+           <Button variant="outline" onClick={handleExport}>
+            <Download className="ml-2 h-4 w-4" /> تصدير CSV
           </Button>
-           <Button asChild variant="secondary">
-              <Link href="/factory-report">
-                <Factory className="ml-2 h-4 w-4" /> تقرير المصنع
-              </Link>
-          </Button>
-           <Button asChild variant="secondary">
-              <Link href="/reports">
-                <LineChart className="ml-2 h-4 w-4" /> تقارير المبيعات والأرباح
-              </Link>
-          </Button>
-          <Dialog open={isDialogOpen} onOpenChange={onDialogOpenChange}>
+        </div>
+      </header>
+
+       <Dialog open={isDialogOpen} onOpenChange={onDialogOpenChange}>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>{editingTransaction ? 'تعديل عملية' : 'إضافة عملية جديدة'}</DialogTitle>
@@ -780,11 +773,6 @@ export default function AccountingDashboard() {
               </Form>
             </DialogContent>
           </Dialog>
-           <Button variant="outline" onClick={handleExport}>
-            <Download className="ml-2 h-4 w-4" /> تصدير CSV
-          </Button>
-        </div>
-      </header>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card>
