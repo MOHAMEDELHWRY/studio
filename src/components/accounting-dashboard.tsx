@@ -67,7 +67,7 @@ import {
 import { SidebarTrigger } from './ui/sidebar';
 import { Skeleton } from './ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
-import { analyzePerformance, type PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
+import { analyzePerformance, PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -504,12 +504,12 @@ export default function AccountingDashboard() {
       </header>
 
        <Dialog open={isDialogOpen} onOpenChange={onDialogOpenChange}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-3xl">
               <DialogHeader>
                 <DialogTitle>{editingTransaction ? 'تعديل عملية' : 'إضافة عملية جديدة'}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 max-h-[80vh] overflow-y-auto pr-6 pl-2">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[80vh] overflow-y-auto p-4">
                   <Accordion type="multiple" defaultValue={['item-1']} className="w-full">
                     <AccordionItem value="item-1">
                       <AccordionTrigger>المعلومات الأساسية</AccordionTrigger>
