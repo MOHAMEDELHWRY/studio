@@ -780,6 +780,7 @@ export default function AccountingDashboard() {
                             <TableHead>الوصف</TableHead>
                             <TableHead>إجمالي الشراء</TableHead>
                             <TableHead>إجمالي البيع</TableHead>
+                            <TableHead>صافي الربح</TableHead>
                             <TableHead>المدفوع للمصنع</TableHead>
                             <TableHead>المستلم من المورد</TableHead>
                             <TableHead>رصيد المبيعات</TableHead>
@@ -799,6 +800,7 @@ export default function AccountingDashboard() {
                                 <TableCell>{t.description}</TableCell>
                                 <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell>{t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell className={`font-bold ${t.supplierSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.supplierSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
@@ -813,7 +815,7 @@ export default function AccountingDashboard() {
                             ))
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={11} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                            <TableCell colSpan={12} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                             </TableRow>
                         )}
                         </TableBody>
