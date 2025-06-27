@@ -6,15 +6,29 @@ import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { ArrowRight, DollarSign, Package, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowRight, DollarSign, Package, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SupplierReportPage() {
   const router = useRouter();
   const params = useParams();
-  const { transactions } = useTransactions();
+  const { transactions, deleteSupplier } = useTransactions();
+  const { toast } = useToast();
+
   const supplierName = useMemo(() => {
     const name = params.supplierName;
     return typeof name === 'string' ? decodeURIComponent(name) : '';
@@ -45,6 +59,16 @@ export default function SupplierReportPage() {
   }, [supplierTransactionsAsc]);
 
   const finalBalance = transactionsWithBalance.length > 0 ? transactionsWithBalance[0].runningBalance : 0;
+  
+  const handleDeleteSupplier = () => {
+    deleteSupplier(supplierName);
+    toast({
+      title: 'تم الحذف',
+      description: `تم حذف المورد "${supplierName}" وجميع عملياته بنجاح.`,
+      variant: 'default',
+    });
+    router.push('/');
+  };
 
   if (!supplierName) {
     return (
@@ -57,13 +81,36 @@ export default function SupplierReportPage() {
   
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="flex justify-between items-center mb-8">
+      <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-primary">تقرير المورد: {supplierName}</h1>
-        <Button asChild variant="outline">
-          <Link href="/">
-             <ArrowRight className="ml-2 h-4 w-4" /> العودة للوحة التحكم
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+           <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">
+                <Trash2 className="ml-2 h-4 w-4" />
+                حذف المورد
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                <AlertDialogDescription>
+                  هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف المورد بشكل دائم
+                  ({supplierName}) وجميع سجلات عملياته.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteSupplier}>متابعة</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Button asChild variant="outline">
+            <Link href="/">
+               <ArrowRight className="ml-2 h-4 w-4" /> العودة للوحة التحكم
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
