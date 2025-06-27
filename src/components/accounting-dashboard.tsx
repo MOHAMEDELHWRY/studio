@@ -227,7 +227,7 @@ export default function AccountingDashboard() {
       const sortedTransactions = supplierGroups[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
       let currentBalance = 0;
       for (const t of sortedTransactions) {
-        currentBalance += t.totalPurchasePrice + t.amountReceivedFromSupplier - t.amountPaidToFactory;
+        currentBalance += t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
         balances[t.id] = currentBalance;
       }
     }
@@ -256,7 +256,7 @@ export default function AccountingDashboard() {
         const supplierTotalBalance = transactions
             .filter(t => t.supplierName === supplierName)
             .reduce((balance, t) => {
-                return balance + t.totalPurchasePrice + t.amountReceivedFromSupplier - t.amountPaidToFactory;
+                return balance + t.totalPurchasePrice - t.amountPaidToFactory - t.amountReceivedFromSupplier;
             }, 0);
         return acc + supplierTotalBalance;
     }, 0);
