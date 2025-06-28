@@ -26,7 +26,9 @@ const PerformanceAnalysisInputSchema = z.object({
 });
 export type PerformanceAnalysisInput = z.infer<typeof PerformanceAnalysisInputSchema>;
 
-const PerformanceAnalysisOutputSchema = z.string().describe('A detailed financial analysis summary in Arabic markdown format.');
+const PerformanceAnalysisOutputSchema = z.object({
+  analysis: z.string().describe('A detailed financial analysis summary in Arabic markdown format.'),
+});
 export type PerformanceAnalysisOutput = z.infer<typeof PerformanceAnalysisOutputSchema>;
 
 export async function analyzePerformance(input: PerformanceAnalysisInput): Promise<PerformanceAnalysisOutput> {
@@ -66,6 +68,9 @@ const analyzePerformanceFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return output!;
+    if (!output) {
+      return { analysis: "لم يتمكن الذكاء الاصطناعي من إنشاء تحليل. قد تكون هناك مشكلة مؤقتة. يرجى المحاولة مرة أخرى لاحقًا." };
+    }
+    return output;
   }
 );
