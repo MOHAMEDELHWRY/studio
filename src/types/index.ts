@@ -7,7 +7,8 @@ export type Transaction = {
   governorate?: string;
   city?: string;
   description: string;
-  type?: string;
+  category?: string;
+  variety?: string;
   quantity: number;
   purchasePrice: number;
   totalPurchasePrice: number;

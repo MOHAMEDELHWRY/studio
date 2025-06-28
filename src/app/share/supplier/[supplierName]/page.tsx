@@ -24,40 +24,74 @@ export default function ShareableSupplierReport() {
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [transactions, supplierName]);
   
-  const transactionsWithBalances = useMemo(() => {
+  const { transactionsWithBalances, supplierStats, tonBreakdown } = useMemo(() => {
     let salesBalance = 0;
     let cashFlowBalance = 0;
     let factoryBalance = 0;
-    return supplierTransactionsAsc.map(t => {
-      salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-      cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
-      factoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
-      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance, factoryRunningBalance: factoryBalance };
-    }).sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [supplierTransactionsAsc]);
 
-  const supplierStats = useMemo(() => {
-    return supplierTransactionsAsc.reduce((acc, t) => {
-      acc.totalPurchases += t.totalPurchasePrice;
-      acc.totalSales += t.totalSellingPrice;
-      acc.totalPaidToFactory += t.amountPaidToFactory;
-      acc.totalReceivedFromSupplier += t.amountReceivedFromSupplier;
-      acc.totalTonsPurchased += t.quantity;
-      if (t.totalSellingPrice > 0) {
-        acc.totalTonsSold += t.quantity;
-      }
-      return acc;
-    }, { 
+    const stats = { 
       totalPurchases: 0, 
       totalSales: 0, 
       totalPaidToFactory: 0, 
       totalReceivedFromSupplier: 0,
       totalTonsPurchased: 0,
       totalTonsSold: 0
+    };
+
+    const breakdown: {
+        byCategory: { [key: string]: { purchased: number; sold: number } },
+        byVariety: { [key: string]: { purchased: number; sold: number } }
+    } = {
+        byCategory: {},
+        byVariety: {}
+    };
+
+    supplierTransactionsAsc.forEach(t => {
+      // Aggregate main stats
+      stats.totalPurchases += t.totalPurchasePrice;
+      stats.totalSales += t.totalSellingPrice;
+      stats.totalPaidToFactory += t.amountPaidToFactory;
+      stats.totalReceivedFromSupplier += t.amountReceivedFromSupplier;
+      stats.totalTonsPurchased += t.quantity;
+
+      const isSold = t.totalSellingPrice > 0;
+      if (isSold) {
+        stats.totalTonsSold += t.quantity;
+      }
+
+      // Category breakdown
+      if (t.category) {
+          if (!breakdown.byCategory[t.category]) {
+              breakdown.byCategory[t.category] = { purchased: 0, sold: 0 };
+          }
+          breakdown.byCategory[t.category].purchased += t.quantity;
+          if (isSold) {
+              breakdown.byCategory[t.category].sold += t.quantity;
+          }
+      }
+
+      // Variety breakdown
+      if (t.variety) {
+          if (!breakdown.byVariety[t.variety]) {
+              breakdown.byVariety[t.variety] = { purchased: 0, sold: 0 };
+          }
+          breakdown.byVariety[t.variety].purchased += t.quantity;
+          if (isSold) {
+              breakdown.byVariety[t.variety].sold += t.quantity;
+          }
+      }
     });
+
+    const transactionsWithBalances = supplierTransactionsAsc.map(t => {
+      salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
+      cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
+      factoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
+      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance, factoryRunningBalance: factoryBalance };
+    }).sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    return { transactionsWithBalances, supplierStats: stats, tonBreakdown: breakdown };
   }, [supplierTransactionsAsc]);
 
-  const tonsRemaining = supplierStats.totalTonsPurchased - supplierStats.totalTonsSold;
 
   const finalSalesBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].salesRunningBalance : 0;
   const finalCashFlowBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].cashFlowRunningBalance : 0;
@@ -116,18 +150,6 @@ export default function ShareableSupplierReport() {
                   <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">
-                <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي الأطنان المشتراة</h3>
-                <p className="text-base sm:text-xl font-bold text-gray-800">{supplierStats.totalTonsPurchased.toLocaleString('ar-EG')} طن</p>
-              </div>
-              <div className="p-2 sm:p-4 border rounded-lg">
-                <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي الأطنان المباعة</h3>
-                <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalTonsSold.toLocaleString('ar-EG')} طن</p>
-              </div>
-              <div className="p-2 sm:p-4 border rounded-lg">
-                <h3 className="text-xs sm:text-sm font-medium text-gray-600">الأطنان المتبقية</h3>
-                <p className={'text-base sm:text-xl font-bold ' + (tonsRemaining >= 0 ? 'text-green-600' : 'text-red-600')}>{tonsRemaining.toLocaleString('ar-EG')} طن</p>
-              </div>
-              <div className="p-2 sm:p-4 border rounded-lg">
                   <h3 className="text-xs sm:text-sm font-medium text-gray-600">رصيد المبيعات النهائي</h3>
                   <p className={'text-base sm:text-xl font-bold ' + (finalSalesBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
@@ -139,6 +161,53 @@ export default function ShareableSupplierReport() {
                   <h3 className="text-xs sm:text-sm font-medium text-gray-600">رصيد لدى المصنع</h3>
                   <p className={'text-base sm:text-xl font-bold ' + (finalFactoryBalance >= 0 ? 'text-green-600' : 'text-red-600')}>{finalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
+          </div>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="text-lg font-bold mb-4 border-b pb-2">ملخص الأطنان</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs sm:text-sm text-right border-collapse border">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="p-2 border font-semibold text-gray-700">الصنف / النوع</th>
+                    <th className="p-2 border font-semibold text-gray-700">إجمالي المشتراة</th>
+                    <th className="p-2 border font-semibold text-gray-700">إجمالي المباعة</th>
+                    <th className="p-2 border font-semibold text-gray-700">المتبقي</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="font-bold bg-gray-100">
+                    <td className="p-2 border">الإجمالي الكلي</td>
+                    <td className="p-2 border">{supplierStats.totalTonsPurchased.toLocaleString('ar-EG')} طن</td>
+                    <td className="p-2 border">{supplierStats.totalTonsSold.toLocaleString('ar-EG')} طن</td>
+                    <td className="p-2 border">{(supplierStats.totalTonsPurchased - supplierStats.totalTonsSold).toLocaleString('ar-EG')} طن</td>
+                  </tr>
+                  {Object.entries(tonBreakdown.byCategory).map(([category, data]) => (
+                    <tr key={category} className="border-b hover:bg-gray-50">
+                      <td className="p-2 border">{category}</td>
+                      <td className="p-2 border">{data.purchased.toLocaleString('ar-EG')} طن</td>
+                      <td className="p-2 border">{data.sold.toLocaleString('ar-EG')} طن</td>
+                      <td className="p-2 border">{(data.purchased - data.sold).toLocaleString('ar-EG')} طن</td>
+                    </tr>
+                  ))}
+                  {Object.entries(tonBreakdown.byVariety).map(([variety, data]) => (
+                    <tr key={variety} className="border-b hover:bg-gray-50">
+                      <td className="p-2 border">نوع {variety}</td>
+                      <td className="p-2 border">{data.purchased.toLocaleString('ar-EG')} طن</td>
+                      <td className="p-2 border">{data.sold.toLocaleString('ar-EG')} طن</td>
+                      <td className="p-2 border">{(data.purchased - data.sold).toLocaleString('ar-EG')} طن</td>
+                    </tr>
+                  ))}
+                  {Object.keys(tonBreakdown.byCategory).length === 0 && Object.keys(tonBreakdown.byVariety).length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-12 text-center text-gray-500 border">
+                        لا توجد تفاصيل أصناف أو أنواع مسجلة.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+            </table>
           </div>
         </section>
 

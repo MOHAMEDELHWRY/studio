@@ -77,7 +77,8 @@ const transactionSchema = z.object({
   governorate: z.string().optional(),
   city: z.string().optional(),
   description: z.string().trim().min(1, 'الوصف مطلوب.'),
-  type: z.string().optional(),
+  category: z.string().optional(),
+  variety: z.string().optional(),
   quantity: z.coerce.number().min(0, 'الكمية يجب أن تكون موجبة.').default(0),
   purchasePrice: z.coerce.number().min(0, 'سعر الشراء يجب أن يكون موجبًا.').default(0),
   sellingPrice: z.coerce.number().min(0, 'سعر البيع يجب أن يكون موجبًا.').default(0),
@@ -125,7 +126,8 @@ export default function AccountingDashboard() {
       governorate: "",
       city: "",
       description: "",
-      type: "",
+      category: "",
+      variety: "",
       quantity: 0,
       purchasePrice: 0,
       sellingPrice: 0,
@@ -179,7 +181,8 @@ export default function AccountingDashboard() {
         governorate: "",
         city: "",
         description: "",
-        type: "",
+        category: "",
+        variety: "",
         quantity: 0,
         purchasePrice: 0,
         sellingPrice: 0,
@@ -299,8 +302,7 @@ export default function AccountingDashboard() {
         t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (t.governorate && t.governorate.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (t.city && t.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (t.type && t.type.toLowerCase().includes(searchTerm.toLowerCase()));
+        (t.city && t.city.toLowerCase().includes(searchTerm.toLowerCase()));
       const dateMatch = dateFilter ? format(t.date, 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd') : true;
       return searchMatch && dateMatch;
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
@@ -345,7 +347,7 @@ export default function AccountingDashboard() {
   }, [filteredAndSortedTransactions]);
 
   const handleExport = () => {
-    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد"];
+    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "الصنف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد"];
     
     const escapeCSV = (str: any) => {
       if (str === null || str === undefined) return "";
@@ -366,7 +368,8 @@ export default function AccountingDashboard() {
         escapeCSV(t.governorate),
         escapeCSV(t.city),
         escapeCSV(t.description),
-        escapeCSV(t.type),
+        escapeCSV(t.category),
+        escapeCSV(t.variety),
         t.quantity,
         t.purchasePrice,
         t.totalPurchasePrice,
@@ -615,11 +618,11 @@ export default function AccountingDashboard() {
                       <AccordionTrigger>تفاصيل البضاعة والتسعير (اختياري)</AccordionTrigger>
                       <AccordionContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                          <FormField
+                           <FormField
                             control={form.control}
                             name="description"
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="md:col-span-2">
                                 <FormLabel>الوصف</FormLabel>
                                 <FormControl>
                                   <Input placeholder="مثال: دفعة من الحساب أو نوع البضاعة" {...field} />
@@ -628,19 +631,50 @@ export default function AccountingDashboard() {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={form.control}
-                            name="type"
-                            render={({ field }) => (
-                               <FormItem>
-                                <FormLabel>النوع (اختياري)</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="مثال: 42.5" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                           <FormField
+                              control={form.control}
+                              name="category"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>الصنف (اختياري)</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="اختر الصنف" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="معبأ">معبأ</SelectItem>
+                                      <SelectItem value="سائب">سائب</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="variety"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>النوع (اختياري)</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="اختر النوع" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="22.5">22.5</SelectItem>
+                                      <SelectItem value="32.5">32.5</SelectItem>
+                                      <SelectItem value="42.5">42.5</SelectItem>
+                                      <SelectItem value="52.5">52.5</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                           <FormField
                             control={form.control}
                             name="quantity"

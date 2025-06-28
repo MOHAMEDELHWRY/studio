@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { DollarSign, Package, Trash2, Factory, Briefcase, Share2, Landmark, PackageCheck, Warehouse, FileText } from 'lucide-react';
+import { DollarSign, Package, Trash2, Factory, Briefcase, Share2, Landmark, Warehouse, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -42,40 +42,73 @@ export default function SupplierReportPage() {
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [transactions, supplierName]);
   
-  const transactionsWithBalances = useMemo(() => {
+  const { transactionsWithBalances, supplierStats, tonBreakdown } = useMemo(() => {
     let salesBalance = 0;
     let cashFlowBalance = 0;
     let factoryBalance = 0;
-    return supplierTransactionsAsc.map(t => {
-      salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-      cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
-      factoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
-      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance, factoryRunningBalance: factoryBalance };
-    }).sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [supplierTransactionsAsc]);
 
-  const supplierStats = useMemo(() => {
-    return supplierTransactionsAsc.reduce((acc, t) => {
-      acc.totalPurchases += t.totalPurchasePrice;
-      acc.totalSales += t.totalSellingPrice;
-      acc.totalPaidToFactory += t.amountPaidToFactory;
-      acc.totalReceivedFromSupplier += t.amountReceivedFromSupplier;
-      acc.totalTonsPurchased += t.quantity;
-      if (t.totalSellingPrice > 0) {
-        acc.totalTonsSold += t.quantity;
-      }
-      return acc;
-    }, { 
+    const stats = { 
       totalPurchases: 0, 
       totalSales: 0, 
       totalPaidToFactory: 0, 
       totalReceivedFromSupplier: 0,
       totalTonsPurchased: 0,
       totalTonsSold: 0
-    });
-  }, [supplierTransactionsAsc]);
+    };
 
-  const tonsRemaining = supplierStats.totalTonsPurchased - supplierStats.totalTonsSold;
+    const breakdown: {
+        byCategory: { [key: string]: { purchased: number; sold: number } },
+        byVariety: { [key: string]: { purchased: number; sold: number } }
+    } = {
+        byCategory: {},
+        byVariety: {}
+    };
+
+    supplierTransactionsAsc.forEach(t => {
+      // Aggregate main stats
+      stats.totalPurchases += t.totalPurchasePrice;
+      stats.totalSales += t.totalSellingPrice;
+      stats.totalPaidToFactory += t.amountPaidToFactory;
+      stats.totalReceivedFromSupplier += t.amountReceivedFromSupplier;
+      stats.totalTonsPurchased += t.quantity;
+
+      const isSold = t.totalSellingPrice > 0;
+      if (isSold) {
+        stats.totalTonsSold += t.quantity;
+      }
+
+      // Category breakdown
+      if (t.category) {
+          if (!breakdown.byCategory[t.category]) {
+              breakdown.byCategory[t.category] = { purchased: 0, sold: 0 };
+          }
+          breakdown.byCategory[t.category].purchased += t.quantity;
+          if (isSold) {
+              breakdown.byCategory[t.category].sold += t.quantity;
+          }
+      }
+
+      // Variety breakdown
+      if (t.variety) {
+          if (!breakdown.byVariety[t.variety]) {
+              breakdown.byVariety[t.variety] = { purchased: 0, sold: 0 };
+          }
+          breakdown.byVariety[t.variety].purchased += t.quantity;
+          if (isSold) {
+              breakdown.byVariety[t.variety].sold += t.quantity;
+          }
+      }
+    });
+
+    const transactionsWithBalances = supplierTransactionsAsc.map(t => {
+      salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
+      cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
+      factoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
+      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance, factoryRunningBalance: factoryBalance };
+    }).sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    return { transactionsWithBalances, supplierStats: stats, tonBreakdown: breakdown };
+  }, [supplierTransactionsAsc]);
 
   const finalSalesBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].salesRunningBalance : 0;
   const finalCashFlowBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].cashFlowRunningBalance : 0;
@@ -180,40 +213,6 @@ export default function SupplierReportPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي الأطنان المشتراة</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {supplierStats.totalTonsPurchased.toLocaleString('ar-EG')} طن
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي الأطنان المباعة</CardTitle>
-            <PackageCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">
-              {supplierStats.totalTonsSold.toLocaleString('ar-EG')} طن
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">الأطنان المتبقية</CardTitle>
-            <Warehouse className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${tonsRemaining > 0 ? 'text-primary' : 'text-success'}`}>
-              {tonsRemaining.toLocaleString('ar-EG')} طن
-            </div>
-             <p className="text-xs text-muted-foreground">(مشتراة - مباعة)</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">رصيد المبيعات النهائي</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -249,6 +248,57 @@ export default function SupplierReportPage() {
           </CardContent>
         </Card>
       </div>
+      
+      <Card className="mb-8">
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+                <Warehouse className="h-5 w-5" />
+                ملخص الأطنان
+            </CardTitle>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>الصنف / النوع</TableHead>
+                        <TableHead>إجمالي المشتراة</TableHead>
+                        <TableHead>إجمالي المباعة</TableHead>
+                        <TableHead>المتبقي</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow className="font-bold bg-muted/50">
+                        <TableCell>الإجمالي الكلي</TableCell>
+                        <TableCell>{supplierStats.totalTonsPurchased.toLocaleString('ar-EG')} طن</TableCell>
+                        <TableCell>{supplierStats.totalTonsSold.toLocaleString('ar-EG')} طن</TableCell>
+                        <TableCell>{(supplierStats.totalTonsPurchased - supplierStats.totalTonsSold).toLocaleString('ar-EG')} طن</TableCell>
+                    </TableRow>
+                    {Object.entries(tonBreakdown.byCategory).map(([category, data]) => (
+                        <TableRow key={category}>
+                            <TableCell>{category}</TableCell>
+                            <TableCell>{data.purchased.toLocaleString('ar-EG')} طن</TableCell>
+                            <TableCell>{data.sold.toLocaleString('ar-EG')} طن</TableCell>
+                            <TableCell>{(data.purchased - data.sold).toLocaleString('ar-EG')} طن</TableCell>
+                        </TableRow>
+                    ))}
+                    {Object.entries(tonBreakdown.byVariety).map(([variety, data]) => (
+                         <TableRow key={variety}>
+                            <TableCell>نوع {variety}</TableCell>
+                            <TableCell>{data.purchased.toLocaleString('ar-EG')} طن</TableCell>
+                            <TableCell>{data.sold.toLocaleString('ar-EG')} طن</TableCell>
+                            <TableCell>{(data.purchased - data.sold).toLocaleString('ar-EG')} طن</TableCell>
+                        </TableRow>
+                    ))}
+                    
+                    {Object.keys(tonBreakdown.byCategory).length === 0 && Object.keys(tonBreakdown.byVariety).length === 0 && (
+                        <TableRow>
+                            <TableCell colSpan={4} className="h-24 text-center">لا توجد تفاصيل أصناف أو أنواع مسجلة.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </CardContent>
+    </Card>
 
       <Card>
         <CardHeader>
