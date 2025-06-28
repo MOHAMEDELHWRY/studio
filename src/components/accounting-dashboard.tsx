@@ -544,7 +544,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ العملية</FormLabel>
-                                <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
+                                <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen} modal={false}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -791,7 +791,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ التنفيذ (اختياري)</FormLabel>
-                                <Popover open={isExecDatePopoverOpen} onOpenChange={setIsExecDatePopoverOpen}>
+                                <Popover open={isExecDatePopoverOpen} onOpenChange={setIsExecDatePopoverOpen} modal={false}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -825,7 +825,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ الاستحقاق (اختياري)</FormLabel>
-                                <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
+                                <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen} modal={false}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -880,7 +880,7 @@ export default function AccountingDashboard() {
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>تاريخ المصروف</FormLabel>
-                        <Popover open={isExpenseDatePopoverOpen} onOpenChange={setIsExpenseDatePopoverOpen}>
+                        <Popover open={isExpenseDatePopoverOpen} onOpenChange={setIsExpenseDatePopoverOpen} modal={false}>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
