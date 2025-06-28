@@ -7,7 +7,7 @@ import { governorates } from '@/data/egypt-governorates';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { type DateRange } from 'react-day-picker';
-import { Bar, ComposedChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Line } from 'recharts';
+import { Bar, ComposedChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Line, TooltipProps } from 'recharts';
 import { DollarSign, LineChart, Calendar as CalendarIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,28 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+
+const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="p-3 bg-card border rounded-lg shadow-lg">
+        <p className="font-bold mb-2 text-card-foreground">{label}</p>
+        {payload.map((pld) => (
+          <div key={pld.dataKey} style={{ color: pld.color }} className="text-sm flex justify-between items-center gap-4">
+            <span>{pld.name}:</span>
+            <span className="font-semibold">
+              {pld.name === 'نسبة الربح'
+                ? `${Number(pld.value).toFixed(2)}%`
+                : `${Number(pld.value).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}`}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function ReportsPage() {
   const { transactions } = useTransactions();
@@ -236,16 +258,8 @@ export default function ReportsPage() {
                 <YAxis yAxisId="left" orientation="left" stroke="hsl(var(--primary))" tickFormatter={(value) => new Intl.NumberFormat('ar-EG', { notation: 'compact' }).format(value as number)} />
                 <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--accent))" tickFormatter={(value) => `${Math.round(value as number)}%`} />
                 <Tooltip
-                  formatter={(value, name) => {
-                    if (name === 'profitPercentage') {
-                      return [`${(value as number).toFixed(2)}%`, 'نسبة الربح'];
-                    }
-                    return [
-                      (value as number).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }),
-                      name === 'totalSales' ? 'المبيعات' : 'الأرباح'
-                    ]
-                  }}
-                  cursor={{ fill: 'hsl(var(--muted))' }}
+                  content={<CustomTooltip />}
+                  cursor={{ fill: 'hsla(var(--card) / 0.8)' }}
                 />
                 <Legend verticalAlign="top" wrapperStyle={{paddingBottom: '20px'}} payload={[
                     { value: 'المبيعات', type: 'square', id: 'totalSales', color: 'hsl(var(--primary))' },
