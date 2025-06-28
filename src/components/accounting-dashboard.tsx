@@ -68,6 +68,7 @@ import { SidebarTrigger } from './ui/sidebar';
 import { Skeleton } from './ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { analyzePerformance } from '@/ai/flows/analyze-performance-flow';
+import { descriptionOptions, categoryOptions, varietyOptions } from '@/data/transaction-data';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -426,7 +427,7 @@ export default function AccountingDashboard() {
       if (result && result.analysis) {
         setAnalysis(result.analysis);
       } else {
-        setAnalysis("لم يتمكن الذكاء الاصطناعي من إنشاء تحليل.");
+        setAnalysis("لم يتمكن الذكاء الاصطناعي من إنشاء تحليل. قد تكون هناك مشكلة مؤقتة. يرجى المحاولة مرة أخرى لاحقًا.");
       }
     } catch (error) {
       console.error("Error generating analysis:", error);
@@ -435,6 +436,7 @@ export default function AccountingDashboard() {
         description: 'حدث خطأ أثناء توليد التحليل. يرجى المحاولة مرة أخرى.',
         variant: 'destructive',
       });
+      setAnalysis("لم نتمكن من إتمام التحليل بسبب خطأ فني.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -619,18 +621,25 @@ export default function AccountingDashboard() {
                       <AccordionContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                            <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                              <FormItem className="md:col-span-2">
-                                <FormLabel>الوصف</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="مثال: دفعة من الحساب أو نوع البضاعة" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                              control={form.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem className="md:col-span-2">
+                                  <FormLabel>الوصف</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="اختر وصف العملية" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {descriptionOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                            <FormField
                               control={form.control}
                               name="category"
@@ -644,8 +653,7 @@ export default function AccountingDashboard() {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      <SelectItem value="معبأ">معبأ</SelectItem>
-                                      <SelectItem value="سائب">سائب</SelectItem>
+                                      {categoryOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
                                     </SelectContent>
                                   </Select>
                                   <FormMessage />
@@ -665,10 +673,7 @@ export default function AccountingDashboard() {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      <SelectItem value="22.5">22.5</SelectItem>
-                                      <SelectItem value="32.5">32.5</SelectItem>
-                                      <SelectItem value="42.5">42.5</SelectItem>
-                                      <SelectItem value="52.5">52.5</SelectItem>
+                                      {varietyOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
                                     </SelectContent>
                                   </Select>
                                   <FormMessage />
