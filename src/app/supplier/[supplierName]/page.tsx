@@ -267,6 +267,7 @@ export default function SupplierReportPage() {
             </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="relative w-full overflow-auto">
             <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                 <TableHeader>
                     <TableRow>
@@ -307,6 +308,7 @@ export default function SupplierReportPage() {
                     )}
                 </TableBody>
             </Table>
+          </div>
         </CardContent>
     </Card>
 
