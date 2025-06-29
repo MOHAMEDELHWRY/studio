@@ -540,7 +540,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ العملية</FormLabel>
-                                <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen} modal={true}>
+                                <Popover modal={false} open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -615,9 +615,16 @@ export default function AccountingDashboard() {
                               render={({ field }) => (
                                 <FormItem className="md:col-span-2">
                                   <FormLabel>الوصف</FormLabel>
-                                   <FormControl>
-                                    <Input placeholder="دفعة من الحساب / سداد مستحقات..." {...field} />
-                                  </FormControl>
+                                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="اختر وصف العملية" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {descriptionOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -655,9 +662,16 @@ export default function AccountingDashboard() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>النوع (اختياري)</FormLabel>
-                                   <FormControl>
-                                    <Input placeholder="مثال: 52.5" {...field} />
-                                  </FormControl>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="اختر النوع" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {varietyOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -773,7 +787,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ التنفيذ (اختياري)</FormLabel>
-                                <Popover open={isExecDatePopoverOpen} onOpenChange={setIsExecDatePopoverOpen} modal={true}>
+                                <Popover modal={false} open={isExecDatePopoverOpen} onOpenChange={setIsExecDatePopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -807,7 +821,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ الاستحقاق (اختياري)</FormLabel>
-                                <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen} modal={true}>
+                                <Popover modal={false} open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -862,7 +876,7 @@ export default function AccountingDashboard() {
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>تاريخ المصروف</FormLabel>
-                        <Popover open={isExpenseDatePopoverOpen} onOpenChange={setIsExpenseDatePopoverOpen} modal={true}>
+                        <Popover modal={false} open={isExpenseDatePopoverOpen} onOpenChange={setIsExpenseDatePopoverOpen}>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
@@ -1011,7 +1025,7 @@ export default function AccountingDashboard() {
                   </div>
               </CardHeader>
               <CardContent>
-                  <Table>
+                  <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                       <TableHeader>
                       <TableRow>
                           <TableHead>م</TableHead>
@@ -1153,7 +1167,7 @@ export default function AccountingDashboard() {
               <CardTitle className="flex items-center gap-2"><Wallet/> سجل المصروفات</CardTitle>
             </CardHeader>
             <CardContent>
-               <Table>
+               <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                 <TableHeader>
                   <TableRow>
                     <TableHead>التاريخ</TableHead>
@@ -1169,29 +1183,31 @@ export default function AccountingDashboard() {
                         <TableCell>{format(e.date, 'dd-MM-yy')}</TableCell>
                         <TableCell>{e.description}</TableCell>
                         <TableCell className="text-destructive">{e.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                        <TableCell className="flex items-center">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenExpenseDialog(e)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  هذا الإجراء سيحذف المصروف بشكل دائم ولا يمكن التراجع عنه.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteExpense(e.id)}>متابعة</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenExpenseDialog(e)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    هذا الإجراء سيحذف المصروف بشكل دائم ولا يمكن التراجع عنه.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteExpense(e.id)}>متابعة</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
