@@ -24,10 +24,17 @@ export default function ShareableSupplierReport() {
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [transactions, supplierName]);
   
-  const { transactionsWithBalances, supplierStats, tonBreakdown } = useMemo(() => {
-    let salesBalance = 0;
-    let cashFlowBalance = 0;
-    let factoryBalance = 0;
+  const { 
+    transactionsWithBalances, 
+    supplierStats, 
+    tonBreakdown, 
+    finalSalesBalance, 
+    finalCashFlowBalance, 
+    finalFactoryBalance 
+  } = useMemo(() => {
+    let runningSalesBalance = 0;
+    let runningCashFlowBalance = 0;
+    let runningFactoryBalance = 0;
 
     const stats = { 
       totalPurchases: 0, 
@@ -83,19 +90,22 @@ export default function ShareableSupplierReport() {
     });
 
     const transactionsWithBalances = supplierTransactionsAsc.map(t => {
-      salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-      cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
-      factoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
-      return { ...t, salesRunningBalance: salesBalance, cashFlowRunningBalance: cashFlowBalance, factoryRunningBalance: factoryBalance };
+      runningSalesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
+      runningCashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
+      runningFactoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
+      return { ...t, salesRunningBalance: runningSalesBalance, cashFlowRunningBalance: runningCashFlowBalance, factoryRunningBalance: runningFactoryBalance };
     }).sort((a, b) => b.date.getTime() - a.date.getTime());
 
-    return { transactionsWithBalances, supplierStats: stats, tonBreakdown: breakdown };
+    return { 
+      transactionsWithBalances, 
+      supplierStats: stats, 
+      tonBreakdown: breakdown,
+      finalSalesBalance: stats.totalReceivedFromSupplier - stats.totalSales,
+      finalCashFlowBalance: stats.totalReceivedFromSupplier - stats.totalPaidToFactory,
+      finalFactoryBalance: stats.totalPaidToFactory - stats.totalPurchases,
+    };
   }, [supplierTransactionsAsc]);
 
-
-  const finalSalesBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].salesRunningBalance : 0;
-  const finalCashFlowBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].cashFlowRunningBalance : 0;
-  const finalFactoryBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].factoryRunningBalance : 0;
 
   if (!supplierName) {
     return (

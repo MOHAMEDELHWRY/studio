@@ -46,29 +46,29 @@ export default function SuppliersReportPage() {
     });
 
     const summaries: SupplierSummary[] = Object.keys(supplierData).map(supplierName => {
-      const supplierTransactions = supplierData[supplierName].sort((a, b) => a.date.getTime() - b.date.getTime());
+      const supplierTransactions = supplierData[supplierName];
       
-      let salesBalance = 0;
-      let cashFlowBalance = 0;
       let totalSales = 0;
       let totalPurchases = 0;
       let totalPaidToFactory = 0;
+      let totalReceivedFromSupplier = 0;
 
       supplierTransactions.forEach(t => {
-        salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-        cashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
         totalSales += t.totalSellingPrice;
         totalPurchases += t.totalPurchasePrice;
         totalPaidToFactory += t.amountPaidToFactory;
+        totalReceivedFromSupplier += t.amountReceivedFromSupplier;
       });
 
+      const finalSalesBalance = totalReceivedFromSupplier - totalSales;
+      const finalCashFlowBalance = totalReceivedFromSupplier - totalPaidToFactory;
       const finalFactoryBalance = totalPaidToFactory - totalPurchases;
 
       return {
         supplierName,
         totalSales,
-        finalSalesBalance: salesBalance,
-        finalCashFlowBalance: cashFlowBalance,
+        finalSalesBalance,
+        finalCashFlowBalance,
         finalFactoryBalance,
         transactionCount: supplierTransactions.length,
       };
@@ -127,90 +127,92 @@ export default function SuppliersReportPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-            <TableHeader>
-              <TableRow>
-                <TableHead>اسم المورد</TableHead>
-                <TableHead>إجمالي المبيعات</TableHead>
-                <TableHead>عدد العمليات</TableHead>
-                <TableHead>رصيد المبيعات</TableHead>
-                <TableHead>الرصيد النقدي</TableHead>
-                <TableHead>رصيد لدى المصنع</TableHead>
-                <TableHead>إجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {supplierSummaries.length > 0 ? (
-                supplierSummaries.map(item => (
-                  <TableRow key={item.supplierName}>
-                    <TableCell className="font-medium">
-                       <Link href={`/supplier/${encodeURIComponent(item.supplierName)}`} className="text-primary hover:underline">
-                         {item.supplierName}
-                       </Link>
-                    </TableCell>
-                    <TableCell>
-                      {item.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                    </TableCell>
-                    <TableCell>
-                      {item.transactionCount}
-                    </TableCell>
-                    <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {item.finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                    </TableCell>
-                     <TableCell className={`font-bold ${item.finalCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {item.finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                    </TableCell>
-                    <TableCell className={`font-bold ${item.finalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {item.finalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button asChild variant="ghost" size="icon">
-                          <Link href={`/sales-balance-report/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`التقرير المبسط لـ ${item.supplierName}`}>
-                            <FileText className="h-4 w-4" />
-                            <span className="sr-only">التقرير المبسط لـ {item.supplierName}</span>
-                          </Link>
-                        </Button>
-                        <Button asChild variant="ghost" size="icon">
-                          <Link href={`/share/supplier/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`مشاركة تقرير ${item.supplierName}`}>
-                            <Share2 className="h-4 w-4" />
-                            <span className="sr-only">مشاركة تقرير {item.supplierName}</span>
-                          </Link>
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title={`حذف المورد ${item.supplierName}`}>
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">حذف المورد {item.supplierName}</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف المورد بشكل دائم
-                                ({item.supplierName}) وجميع سجلات عملياته.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteSupplier(item.supplierName)}>متابعة</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+          <div className="relative w-full overflow-auto">
+            <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>اسم المورد</TableHead>
+                  <TableHead>إجمالي المبيعات</TableHead>
+                  <TableHead>عدد العمليات</TableHead>
+                  <TableHead>رصيد المبيعات</TableHead>
+                  <TableHead>الرصيد النقدي</TableHead>
+                  <TableHead>رصيد لدى المصنع</TableHead>
+                  <TableHead>إجراءات</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {supplierSummaries.length > 0 ? (
+                  supplierSummaries.map(item => (
+                    <TableRow key={item.supplierName}>
+                      <TableCell className="font-medium">
+                         <Link href={`/supplier/${encodeURIComponent(item.supplierName)}`} className="text-primary hover:underline">
+                           {item.supplierName}
+                         </Link>
+                      </TableCell>
+                      <TableCell>
+                        {item.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+                      </TableCell>
+                      <TableCell>
+                        {item.transactionCount}
+                      </TableCell>
+                      <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {item.finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+                      </TableCell>
+                       <TableCell className={`font-bold ${item.finalCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {item.finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+                      </TableCell>
+                      <TableCell className={`font-bold ${item.finalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {item.finalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button asChild variant="ghost" size="icon">
+                            <Link href={`/sales-balance-report/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`التقرير المبسط لـ ${item.supplierName}`}>
+                              <FileText className="h-4 w-4" />
+                              <span className="sr-only">التقرير المبسط لـ {item.supplierName}</span>
+                            </Link>
+                          </Button>
+                          <Button asChild variant="ghost" size="icon">
+                            <Link href={`/share/supplier/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`مشاركة تقرير ${item.supplierName}`}>
+                              <Share2 className="h-4 w-4" />
+                              <span className="sr-only">مشاركة تقرير {item.supplierName}</span>
+                            </Link>
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title={`حذف المورد ${item.supplierName}`}>
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">حذف المورد {item.supplierName}</span>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف المورد بشكل دائم
+                                  ({item.supplierName}) وجميع سجلات عملياته.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteSupplier(item.supplierName)}>متابعة</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      لا يوجد موردين لعرضهم. قم بإضافة عمليات أولاً.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    لا يوجد موردين لعرضهم. قم بإضافة عمليات أولاً.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
