@@ -617,9 +617,16 @@ export default function AccountingDashboard() {
                               render={({ field }) => (
                                 <FormItem className="md:col-span-2">
                                   <FormLabel>الوصف</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="مثال: دفعة من الحساب، سداد مستحقات..." {...field} />
-                                  </FormControl>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="اختر وصف العملية" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {descriptionOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -657,9 +664,16 @@ export default function AccountingDashboard() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>النوع (اختياري)</FormLabel>
-                                   <FormControl>
-                                    <Input placeholder="مثال: 42.5" {...field} />
-                                  </FormControl>
+                                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="اختر النوع" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {varietyOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -970,10 +984,11 @@ export default function AccountingDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${totalSuppliersSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <div className={`text-2xl font-bold ${totalSuppliersSalesBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
               {totalSuppliersSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
              <p className="text-xs text-muted-foreground">على أساس (مستلم - مبيعات)</p>
+             <p className="text-xs text-muted-foreground">{totalSuppliersSalesBalance >= 0 ? 'إجمالي عليك للموردين' : 'إجمالي لك عند الموردين'}</p>
           </CardContent>
         </Card>
         <Card>

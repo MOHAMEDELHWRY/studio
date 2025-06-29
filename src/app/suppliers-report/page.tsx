@@ -155,7 +155,7 @@ export default function SuppliersReportPage() {
                       <TableCell>
                         {item.transactionCount}
                       </TableCell>
-                      <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
                         {item.finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
                       </TableCell>
                        <TableCell className={`font-bold ${item.finalCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>

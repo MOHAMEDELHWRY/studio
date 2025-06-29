@@ -227,10 +227,11 @@ export default function SupplierReportPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <div className={`text-2xl font-bold ${finalSalesBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
               {finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
              <p className="text-xs text-muted-foreground">(المستلم من المورد) - (إجمالي البيع)</p>
+             <p className="text-xs text-muted-foreground">{finalSalesBalance >= 0 ? 'رصيد عليك للمورد' : 'رصيد لك عند المورد'}</p>
           </CardContent>
         </Card>
         <Card>
@@ -350,7 +351,7 @@ export default function SupplierReportPage() {
                       </TableCell>
                       <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                       <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                      <TableCell className={`font-bold ${t.salesRunningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.salesRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell className={`font-bold ${t.salesRunningBalance >= 0 ? 'text-destructive' : 'text-success'}`}>{t.salesRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                        <TableCell className={`font-bold ${t.cashFlowRunningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.cashFlowRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                        <TableCell className={`font-bold ${t.factoryRunningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.factoryRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     </TableRow>
