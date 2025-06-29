@@ -3,13 +3,24 @@
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
-import { Users, Factory, Share2, FileText } from 'lucide-react';
+import { Users, Factory, Share2, FileText, Trash2 } from 'lucide-react';
 import { type Transaction } from '@/types';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface SupplierSummary {
   supplierName: string;
@@ -21,7 +32,7 @@ interface SupplierSummary {
 }
 
 export default function SuppliersReportPage() {
-  const { transactions } = useTransactions();
+  const { transactions, deleteSupplier } = useTransactions();
 
   const supplierSummaries = useMemo(() => {
     const supplierData: { [key: string]: Transaction[] } = {};
@@ -166,6 +177,27 @@ export default function SuppliersReportPage() {
                             <span className="sr-only">مشاركة تقرير {item.supplierName}</span>
                           </Link>
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title={`حذف المورد ${item.supplierName}`}>
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">حذف المورد {item.supplierName}</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف المورد بشكل دائم
+                                ({item.supplierName}) وجميع سجلات عملياته.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteSupplier(item.supplierName)}>متابعة</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

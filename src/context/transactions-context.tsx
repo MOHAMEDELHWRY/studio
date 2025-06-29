@@ -162,6 +162,11 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       await batch.commit();
 
       setTransactions(prev => prev.filter(t => t.supplierName !== supplierName));
+      toast({
+        title: 'تم الحذف',
+        description: `تم حذف المورد "${supplierName}" وجميع عملياته بنجاح.`,
+        variant: 'default',
+      });
     } catch (error) {
        console.error("Error deleting supplier transactions: ", error);
        toast({ title: "خطأ", description: "لم نتمكن من حذف عمليات المورد.", variant: "destructive" });
