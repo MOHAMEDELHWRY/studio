@@ -85,7 +85,7 @@ export default function FactoryReportPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
             <TableHeader>
               <TableRow>
                 <TableHead>اسم المورد</TableHead>

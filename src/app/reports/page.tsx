@@ -22,14 +22,21 @@ import { NameType, ValueType } from 'recharts/types/component/DefaultTooltipCont
 
 const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
   if (active && payload && payload.length) {
+    const getLabel = (key: string | undefined) => {
+        if (key === 'totalSales') return 'المبيعات';
+        if (key === 'totalProfit') return 'الأرباح';
+        if (key === 'profitPercentage') return 'نسبة الربح';
+        return key;
+    }
+    
     return (
       <div className="p-3 bg-card border rounded-lg shadow-lg">
         <p className="font-bold mb-2 text-card-foreground">{label}</p>
         {payload.map((pld) => (
           <div key={pld.dataKey} style={{ color: pld.color }} className="text-sm flex justify-between items-center gap-4">
-            <span>{pld.name}:</span>
+            <span>{getLabel(pld.dataKey)}:</span>
             <span className="font-semibold">
-              {pld.name === 'نسبة الربح'
+              {pld.dataKey === 'profitPercentage'
                 ? `${Number(pld.value).toFixed(2)}%`
                 : `${Number(pld.value).toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}`}
             </span>
@@ -282,7 +289,7 @@ export default function ReportsPage() {
           <CardTitle>البيانات التفصيلية</CardTitle>
         </CardHeader>
         <CardContent>
-           <Table>
+           <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
             <TableHeader>
               <TableRow>
                 <TableHead>{groupingKeyHeader}</TableHead>

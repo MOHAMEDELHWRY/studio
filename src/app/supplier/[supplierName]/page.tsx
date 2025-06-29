@@ -257,7 +257,7 @@ export default function SupplierReportPage() {
             </CardTitle>
         </CardHeader>
         <CardContent>
-            <Table>
+            <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                 <TableHeader>
                     <TableRow>
                         <TableHead>الصنف / النوع</TableHead>
@@ -305,7 +305,7 @@ export default function SupplierReportPage() {
           <CardTitle>سجل عمليات المورد</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
             <TableHeader>
               <TableRow>
                 <TableHead>التاريخ</TableHead>

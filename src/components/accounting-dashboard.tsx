@@ -67,7 +67,7 @@ import {
 import { SidebarTrigger } from './ui/sidebar';
 import { Skeleton } from './ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
-import { analyzePerformance, PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
+import { analyzePerformance, type PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
 import { descriptionOptions, categoryOptions, varietyOptions } from '@/data/transaction-data';
 
 const transactionSchema = z.object({
@@ -77,7 +77,7 @@ const transactionSchema = z.object({
   supplierName: z.string().trim().min(1, 'اسم المورد مطلوب.'),
   governorate: z.string().optional(),
   city: z.string().optional(),
-  description: z.string().trim().optional(),
+  description: z.string().optional(),
   category: z.string().optional(),
   variety: z.string().optional(),
   quantity: z.coerce.number().min(0, 'الكمية يجب أن تكون موجبة.').default(0),
@@ -121,8 +121,8 @@ export default function AccountingDashboard() {
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       date: new Date(),
-      executionDate: new Date(),
-      dueDate: new Date(),
+      executionDate: undefined,
+      dueDate: undefined,
       supplierName: "",
       governorate: "",
       city: "",
@@ -176,8 +176,8 @@ export default function AccountingDashboard() {
     } else {
       form.reset({
         date: new Date(),
-        executionDate: new Date(),
-        dueDate: new Date(),
+        executionDate: undefined,
+        dueDate: undefined,
         supplierName: "",
         governorate: "",
         city: "",
@@ -255,8 +255,6 @@ export default function AccountingDashboard() {
         } else {
             const newTransaction: Omit<Transaction, 'id'> = {
               ...transactionData,
-              executionDate: transactionData.executionDate || transactionData.date,
-              dueDate: transactionData.dueDate || transactionData.date,
             };
             await addTransaction(newTransaction as Transaction);
             toast({
@@ -289,6 +287,10 @@ export default function AccountingDashboard() {
     setIsExpenseDialogOpen(false);
   };
 
+  const handleDeleteTransaction = async (transactionId: string) => {
+    await deleteTransaction(transactionId);
+  };
+  
   const handleDeleteExpense = async (expenseId: string) => {
     await deleteExpense(expenseId);
   };
@@ -1083,7 +1085,7 @@ export default function AccountingDashboard() {
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
                                         <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => deleteTransaction(t.id)}>متابعة</AlertDialogAction>
+                                        <AlertDialogAction onClick={() => handleDeleteTransaction(t.id)}>متابعة</AlertDialogAction>
                                       </AlertDialogFooter>
                                     </AlertDialogContent>
                                   </AlertDialog>
