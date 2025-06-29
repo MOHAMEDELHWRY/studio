@@ -107,7 +107,7 @@ export default function AccountingDashboard() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const { toast } = useToast();
-  const [analysis, setAnalysis] = useState<string>('');
+  const [analysis, setAnalysis] = useState<PerformanceAnalysisOutput | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
   // States for controlling date picker popovers
@@ -405,7 +405,7 @@ export default function AccountingDashboard() {
     }
 
     setIsAnalyzing(true);
-    setAnalysis(''); // Clear previous analysis
+    setAnalysis(null); // Clear previous analysis
 
     try {
       const analysisInput = {
@@ -423,9 +423,9 @@ export default function AccountingDashboard() {
 
       const result: PerformanceAnalysisOutput = await analyzePerformance(analysisInput);
       if (result && result.analysis) {
-        setAnalysis(result.analysis);
+        setAnalysis(result);
       } else {
-        setAnalysis("لم يتمكن الذكاء الاصطناعي من إنشاء تحليل. قد تكون هناك مشكلة مؤقتة. يرجى المحاولة مرة أخرى لاحقًا.");
+        setAnalysis({ analysis: "لم يتمكن الذكاء الاصطناعي من إنشاء تحليل. قد تكون هناك مشكلة مؤقتة. يرجى المحاولة مرة أخرى لاحقًا." });
       }
     } catch (error) {
       console.error("Error generating analysis:", error);
@@ -434,7 +434,7 @@ export default function AccountingDashboard() {
         description: 'حدث خطأ أثناء توليد التحليل. يرجى المحاولة مرة أخرى.',
         variant: 'destructive',
       });
-      setAnalysis("لم نتمكن من إتمام التحليل بسبب خطأ فني.");
+      setAnalysis({ analysis: "لم نتمكن من إتمام التحليل بسبب خطأ فني." });
     } finally {
       setIsAnalyzing(false);
     }
@@ -617,16 +617,9 @@ export default function AccountingDashboard() {
                               render={({ field }) => (
                                 <FormItem className="md:col-span-2">
                                   <FormLabel>الوصف</FormLabel>
-                                   <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="اختر وصف العملية" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {descriptionOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
+                                  <FormControl>
+                                    <Input placeholder="مثال: دفعة من الحساب، سداد مستحقات..." {...field} />
+                                  </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -664,16 +657,9 @@ export default function AccountingDashboard() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>النوع (اختياري)</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="اختر النوع" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {varietyOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
+                                   <FormControl>
+                                    <Input placeholder="مثال: 42.5" {...field} />
+                                  </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -856,10 +842,38 @@ export default function AccountingDashboard() {
                     </AccordionItem>
                   </Accordion>
                   <DialogFooter className="pt-4">
-                    <Button type="submit">حفظ العملية</Button>
+                    {editingTransaction && (
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button type="button" variant="destructive" className="mr-auto">
+                                    <Trash2 className="ml-2 h-4 w-4" />
+                                    حذف
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف العملية بشكل دائم.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction onClick={async () => {
+                                        if (editingTransaction) {
+                                            await handleDeleteTransaction(editingTransaction.id);
+                                            setIsDialogOpen(false);
+                                            setEditingTransaction(null);
+                                        }
+                                    }}>متابعة</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
                     <DialogClose asChild>
                       <Button type="button" variant="secondary">إلغاء</Button>
                     </DialogClose>
+                    <Button type="submit">{editingTransaction ? 'حفظ التعديلات' : 'حفظ العملية'}</Button>
                   </DialogFooter>
                 </form>
               </Form>
@@ -1027,79 +1041,81 @@ export default function AccountingDashboard() {
                   </div>
               </CardHeader>
               <CardContent>
-                  <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-                      <TableHeader>
-                      <TableRow>
-                          <TableHead>م</TableHead>
-                          <TableHead>التاريخ</TableHead>
-                          <TableHead>اسم المورد</TableHead>
-                          <TableHead>الوصف</TableHead>
-                          <TableHead>إجمالي الشراء</TableHead>
-                          <TableHead>إجمالي البيع</TableHead>
-                          <TableHead>صافي الربح</TableHead>
-                          <TableHead>المدفوع للمصنع</TableHead>
-                          <TableHead>المستلم من المورد</TableHead>
-                          <TableHead>الإجراءات</TableHead>
-                      </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                      {filteredAndSortedTransactions.length > 0 ? (
-                          filteredAndSortedTransactions.map((t, index) => (
-                              <TableRow key={t.id}>
-                              <TableCell>{filteredAndSortedTransactions.length - index}</TableCell>
-                              <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
-                              <TableCell>
-                                  <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
-                              </TableCell>
-                              <TableCell>{t.description}</TableCell>
-                              <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                              <TableCell>
-                                {t.totalSellingPrice > 0 ? (
-                                  t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })
-                                ) : (
-                                  <span className="text-muted-foreground">لم يتم البيع</span>
-                                )}
-                              </TableCell>
-                              <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                              <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                              <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center">
-                                  <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
-                                    <Pencil className="h-4 w-4" />
-                                    <span className="sr-only">تعديل</span>
-                                  </Button>
-                                   <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                        <Trash2 className="h-4 w-4" />
-                                         <span className="sr-only">حذف</span>
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف العملية بشكل دائم.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteTransaction(t.id)}>متابعة</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </div>
-                              </TableCell>
-                              </TableRow>
-                          ))
-                      ) : (
+                  <div className="relative w-full overflow-auto">
+                      <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
+                          <TableHeader>
                           <TableRow>
-                          <TableCell colSpan={10} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                              <TableHead>م</TableHead>
+                              <TableHead>التاريخ</TableHead>
+                              <TableHead>اسم المورد</TableHead>
+                              <TableHead>الوصف</TableHead>
+                              <TableHead>إجمالي الشراء</TableHead>
+                              <TableHead>إجمالي البيع</TableHead>
+                              <TableHead>صافي الربح</TableHead>
+                              <TableHead>المدفوع للمصنع</TableHead>
+                              <TableHead>المستلم من المورد</TableHead>
+                              <TableHead>الإجراءات</TableHead>
                           </TableRow>
-                      )}
-                      </TableBody>
-                  </Table>
+                          </TableHeader>
+                          <TableBody>
+                          {filteredAndSortedTransactions.length > 0 ? (
+                              filteredAndSortedTransactions.map((t, index) => (
+                                  <TableRow key={t.id}>
+                                  <TableCell>{filteredAndSortedTransactions.length - index}</TableCell>
+                                  <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                                  <TableCell>
+                                      <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
+                                  </TableCell>
+                                  <TableCell>{t.description}</TableCell>
+                                  <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                  <TableCell>
+                                    {t.totalSellingPrice > 0 ? (
+                                      t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })
+                                    ) : (
+                                      <span className="text-muted-foreground">لم يتم البيع</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                  <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                  <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center">
+                                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
+                                        <Pencil className="h-4 w-4" />
+                                        <span className="sr-only">تعديل</span>
+                                      </Button>
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                            <Trash2 className="h-4 w-4" />
+                                            <span className="sr-only">حذف</span>
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف العملية بشكل دائم.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteTransaction(t.id)}>متابعة</AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
+                                  </TableCell>
+                                  </TableRow>
+                              ))
+                          ) : (
+                              <TableRow>
+                              <TableCell colSpan={10} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                              </TableRow>
+                          )}
+                          </TableBody>
+                      </Table>
+                  </div>
               </CardContent>
           </Card>
       </div>
@@ -1144,7 +1160,7 @@ export default function AccountingDashboard() {
                       </div>
                   ) : analysis ? (
                       <div className="prose prose-sm dark:prose-invert max-w-none text-right text-sm h-64 overflow-y-auto">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{analysis}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{analysis.analysis}</ReactMarkdown>
                       </div>
                   ) : (
                       <div className="text-center text-muted-foreground flex-grow flex flex-col justify-center items-center gap-4">
@@ -1169,57 +1185,59 @@ export default function AccountingDashboard() {
               <CardTitle className="flex items-center gap-2"><Wallet/> سجل المصروفات</CardTitle>
             </CardHeader>
             <CardContent>
-               <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>التاريخ</TableHead>
-                    <TableHead>الوصف</TableHead>
-                    <TableHead>المبلغ</TableHead>
-                    <TableHead>إجراء</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expenses.length > 0 ? (
-                    expenses.map(e => (
-                      <TableRow key={e.id}>
-                        <TableCell>{format(e.date, 'dd-MM-yy')}</TableCell>
-                        <TableCell>{e.description}</TableCell>
-                        <TableCell className="text-destructive">{e.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenExpenseDialog(e)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    هذا الإجراء سيحذف المصروف بشكل دائم ولا يمكن التراجع عنه.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteExpense(e.id)}>متابعة</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
+               <div className="relative w-full overflow-auto">
+                <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center">لا توجد مصروفات.</TableCell>
+                      <TableHead>التاريخ</TableHead>
+                      <TableHead>الوصف</TableHead>
+                      <TableHead>المبلغ</TableHead>
+                      <TableHead>إجراء</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {expenses.length > 0 ? (
+                      expenses.map(e => (
+                        <TableRow key={e.id}>
+                          <TableCell>{format(e.date, 'dd-MM-yy')}</TableCell>
+                          <TableCell>{e.description}</TableCell>
+                          <TableCell className="text-destructive">{e.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenExpenseDialog(e)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      هذا الإجراء سيحذف المصروف بشكل دائم ولا يمكن التراجع عنه.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteExpense(e.id)}>متابعة</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="h-24 text-center">لا توجد مصروفات.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+               </div>
             </CardContent>
           </Card>
         </div>
