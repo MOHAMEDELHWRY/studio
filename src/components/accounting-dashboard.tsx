@@ -67,7 +67,7 @@ import {
 import { SidebarTrigger } from './ui/sidebar';
 import { Skeleton } from './ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
-import { analyzePerformance } from '@/ai/flows/analyze-performance-flow';
+import { analyzePerformance, PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
 import { descriptionOptions, categoryOptions, varietyOptions } from '@/data/transaction-data';
 
 const transactionSchema = z.object({
@@ -98,7 +98,7 @@ const expenseSchema = z.object({
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 export default function AccountingDashboard() {
-  const { transactions, addTransaction, updateTransaction, expenses, addExpense, updateExpense, deleteExpense, loading } = useTransactions();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, expenses, addExpense, updateExpense, deleteExpense, loading } = useTransactions();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -423,7 +423,7 @@ export default function AccountingDashboard() {
         totalExpenses: totalExpenses,
       };
 
-      const result = await analyzePerformance(analysisInput);
+      const result: PerformanceAnalysisOutput = await analyzePerformance(analysisInput);
       if (result && result.analysis) {
         setAnalysis(result.analysis);
       } else {
@@ -1066,10 +1066,32 @@ export default function AccountingDashboard() {
                               <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                               <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                               <TableCell>
-                                <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
-                                  <Pencil className="h-4 w-4" />
-                                  <span className="sr-only">تعديل</span>
-                                </Button>
+                                <div className="flex items-center">
+                                  <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
+                                    <Pencil className="h-4 w-4" />
+                                    <span className="sr-only">تعديل</span>
+                                  </Button>
+                                   <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                        <Trash2 className="h-4 w-4" />
+                                         <span className="sr-only">حذف</span>
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف العملية بشكل دائم.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => deleteTransaction(t.id)}>متابعة</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
                               </TableCell>
                               </TableRow>
                           ))

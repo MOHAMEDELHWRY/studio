@@ -21,6 +21,7 @@ interface TransactionsContextType {
   transactions: Transaction[];
   addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
   updateTransaction: (updatedTransaction: Transaction) => Promise<void>;
+  deleteTransaction: (transactionId: string) => Promise<void>;
   deleteSupplier: (supplierName: string) => Promise<void>;
   expenses: Expense[];
   addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
@@ -129,6 +130,23 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteTransaction = async (transactionId: string) => {
+    if (!currentUser) return;
+    try {
+      const transactionDoc = doc(db, 'users', currentUser.uid, 'transactions', transactionId);
+      await deleteDoc(transactionDoc);
+      setTransactions(prev => prev.filter(t => t.id !== transactionId));
+      toast({
+        title: "تم الحذف",
+        description: "تم حذف العملية بنجاح.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error deleting transaction: ", error);
+      toast({ title: "خطأ", description: "لم نتمكن من حذف العملية.", variant: "destructive" });
+    }
+  };
+
   const deleteSupplier = async (supplierName: string) => {
     if (!currentUser) return;
      try {
@@ -199,7 +217,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <TransactionsContext.Provider value={{ transactions, addTransaction, updateTransaction, deleteSupplier, expenses, addExpense, updateExpense, deleteExpense, loading }}>
+    <TransactionsContext.Provider value={{ transactions, addTransaction, updateTransaction, deleteTransaction, deleteSupplier, expenses, addExpense, updateExpense, deleteExpense, loading }}>
       {children}
     </TransactionsContext.Provider>
   );
