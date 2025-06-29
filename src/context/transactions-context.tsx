@@ -210,6 +210,11 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const expenseDoc = doc(db, 'users', currentUser.uid, 'expenses', expenseId);
       await deleteDoc(expenseDoc);
       setExpenses(prev => prev.filter(e => e.id !== expenseId));
+      toast({
+        title: "تم الحذف",
+        description: "تم حذف المصروف بنجاح.",
+        variant: "default",
+      });
     } catch (error) {
       console.error("Error deleting expense: ", error);
       toast({ title: "خطأ", description: "لم نتمكن من حذف المصروف.", variant: "destructive" });

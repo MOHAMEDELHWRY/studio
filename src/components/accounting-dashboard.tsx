@@ -77,7 +77,7 @@ const transactionSchema = z.object({
   supplierName: z.string().trim().min(1, 'اسم المورد مطلوب.'),
   governorate: z.string().optional(),
   city: z.string().optional(),
-  description: z.string().trim().min(1, 'الوصف مطلوب.'),
+  description: z.string().trim().optional(),
   category: z.string().optional(),
   variety: z.string().optional(),
   quantity: z.coerce.number().min(0, 'الكمية يجب أن تكون موجبة.').default(0),
@@ -238,6 +238,7 @@ export default function AccountingDashboard() {
           totalPurchasePrice,
           totalSellingPrice,
           profit,
+          description: values.description || 'عملية غير محددة',
         };
         
         if (editingTransaction) {
@@ -290,11 +291,6 @@ export default function AccountingDashboard() {
 
   const handleDeleteExpense = async (expenseId: string) => {
     await deleteExpense(expenseId);
-    toast({
-      title: "تم الحذف",
-      description: "تم حذف المصروف بنجاح.",
-      variant: "default",
-    });
   };
 
   const filteredAndSortedTransactions = useMemo(() => {
@@ -544,7 +540,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ العملية</FormLabel>
-                                <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen} modal={false}>
+                                <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen} modal={true}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -613,6 +609,19 @@ export default function AccountingDashboard() {
                                 </FormItem>
                               )}
                             />
+                             <FormField
+                              control={form.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem className="md:col-span-2">
+                                  <FormLabel>الوصف</FormLabel>
+                                   <FormControl>
+                                    <Input placeholder="دفعة من الحساب / سداد مستحقات..." {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                         </div>
                       </AccordionContent>
                     </AccordionItem>
@@ -620,26 +629,6 @@ export default function AccountingDashboard() {
                       <AccordionTrigger>تفاصيل البضاعة والتسعير (اختياري)</AccordionTrigger>
                       <AccordionContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                           <FormField
-                              control={form.control}
-                              name="description"
-                              render={({ field }) => (
-                                <FormItem className="md:col-span-2">
-                                  <FormLabel>الوصف</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="اختر وصف العملية" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {descriptionOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
                            <FormField
                               control={form.control}
                               name="category"
@@ -666,16 +655,9 @@ export default function AccountingDashboard() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>النوع (اختياري)</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="اختر النوع" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {varietyOptions.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
+                                   <FormControl>
+                                    <Input placeholder="مثال: 52.5" {...field} />
+                                  </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -791,7 +773,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ التنفيذ (اختياري)</FormLabel>
-                                <Popover open={isExecDatePopoverOpen} onOpenChange={setIsExecDatePopoverOpen} modal={false}>
+                                <Popover open={isExecDatePopoverOpen} onOpenChange={setIsExecDatePopoverOpen} modal={true}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -825,7 +807,7 @@ export default function AccountingDashboard() {
                             render={({ field }) => (
                               <FormItem className="flex flex-col">
                                 <FormLabel>تاريخ الاستحقاق (اختياري)</FormLabel>
-                                <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen} modal={false}>
+                                <Popover open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen} modal={true}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button
@@ -880,7 +862,7 @@ export default function AccountingDashboard() {
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>تاريخ المصروف</FormLabel>
-                        <Popover open={isExpenseDatePopoverOpen} onOpenChange={setIsExpenseDatePopoverOpen} modal={false}>
+                        <Popover open={isExpenseDatePopoverOpen} onOpenChange={setIsExpenseDatePopoverOpen} modal={true}>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
