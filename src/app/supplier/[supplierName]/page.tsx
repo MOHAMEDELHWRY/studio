@@ -39,7 +39,14 @@ export default function SupplierReportPage() {
     if (!supplierName) return [];
     return transactions
       .filter(t => t.supplierName === supplierName)
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
+      .sort((a, b) => {
+        const dateA = a.date.getTime();
+        const dateB = b.date.getTime();
+        if (dateA !== dateB) {
+            return dateA - dateB;
+        }
+        return a.id.localeCompare(b.id);
+      });
   }, [transactions, supplierName]);
   
   const { 
@@ -112,7 +119,7 @@ export default function SupplierReportPage() {
       runningCashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
       runningFactoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
       return { ...t, salesRunningBalance: runningSalesBalance, cashFlowRunningBalance: runningCashFlowBalance, factoryRunningBalance: runningFactoryBalance };
-    }).sort((a, b) => b.date.getTime() - a.date.getTime());
+    }).reverse();
     
     const finalFactoryBalance = stats.totalPaidToFactory - stats.totalPurchases;
 
