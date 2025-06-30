@@ -232,7 +232,11 @@ export default function AccountingDashboard() {
     try {
         const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
         const totalSellingPrice = (values.quantity || 0) * (values.sellingPrice || 0);
-        const profit = totalSellingPrice - totalPurchasePrice - (values.taxes || 0);
+        
+        const profit =
+            (values.sellingPrice || 0) > 0
+                ? totalSellingPrice - totalPurchasePrice - (values.taxes || 0)
+                : 0;
 
         const transactionData = {
           ...values,
@@ -448,7 +452,10 @@ export default function AccountingDashboard() {
 
   const totalPurchasePriceDisplay = (watchedValues.quantity || 0) * (watchedValues.purchasePrice || 0);
   const totalSellingPriceDisplay = (watchedValues.quantity || 0) * (watchedValues.sellingPrice || 0);
-  const profitDisplay = totalSellingPriceDisplay - totalPurchasePriceDisplay - (watchedValues.taxes || 0);
+  const profitDisplay =
+    (watchedValues.sellingPrice || 0) > 0
+      ? totalSellingPriceDisplay - totalPurchasePriceDisplay - (watchedValues.taxes || 0)
+      : 0;
   
   if (loading) {
     return (
@@ -1101,7 +1108,13 @@ export default function AccountingDashboard() {
                                       <span className="text-muted-foreground">لم يتم البيع</span>
                                     )}
                                   </TableCell>
-                                  <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                  <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                    {t.totalSellingPrice > 0 ? (
+                                      t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
                                   <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                   <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                   <TableCell>

@@ -334,7 +334,13 @@ export default function SupplierReportPage() {
                           <span className="text-muted-foreground">لم يتم البيع</span>
                         )}
                       </TableCell>
-                       <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                       <TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {t.totalSellingPrice > 0 ? (
+                          t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                       </TableCell>
                       <TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                       <TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                        <TableCell className={`font-bold ${t.factoryRunningBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{t.factoryRunningBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
