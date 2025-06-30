@@ -310,7 +310,7 @@ export default function SupplierReportPage() {
                 <TableRow>
                   <TableHead>التاريخ</TableHead>
                   <TableHead>الوصف</TableHead>
-                  <TableHead>الكمية (طن)</TableHead>
+                  <TableHead>الكمية / النوع</TableHead>
                   <TableHead>إجمالي الشراء</TableHead>
                   <TableHead>إجمالي البيع</TableHead>
                   <TableHead>الربح</TableHead>
@@ -325,7 +325,7 @@ export default function SupplierReportPage() {
                     <TableRow key={t.id}>
                       <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                       <TableCell className="font-medium">{t.description}</TableCell>
-                      <TableCell>{t.quantity.toLocaleString('ar-EG')}</TableCell>
+                      <TableCell>{t.quantity.toLocaleString('ar-EG')} طن {t.variety && <span className="text-muted-foreground text-xs">({t.variety})</span>}</TableCell>
                       <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                       <TableCell>
                         {t.totalSellingPrice > 0 ? (
