@@ -14,7 +14,8 @@ import {
   LineChart,
   Calendar as CalendarIcon,
   ShoppingCart,
-  Users,
+  Factory,
+  Landmark,
   MinusCircle,
   Wallet,
   Trash2,
@@ -307,25 +308,30 @@ export default function AccountingDashboard() {
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
   }, [transactions, searchTerm, dateFilter]);
   
-  const { totalSales, totalPurchases, profitFromTransactions, totalSuppliersSalesBalance } = useMemo(() => {
-    const stats = transactions.reduce((acc, t) => {
+  const {
+    totalSales,
+    totalPurchases,
+    profitFromTransactions,
+    totalReceivedFromSuppliers,
+    totalPaidToFactory,
+  } = useMemo(() => {
+    return transactions.reduce(
+      (acc, t) => {
         acc.totalSales += t.totalSellingPrice;
         acc.totalPurchases += t.totalPurchasePrice;
         acc.profitFromTransactions += t.profit;
+        acc.totalReceivedFromSuppliers += t.amountReceivedFromSupplier;
+        acc.totalPaidToFactory += t.amountPaidToFactory;
         return acc;
-    }, { totalSales: 0, totalPurchases: 0, profitFromTransactions: 0 });
-
-    const supplierBalances: { [key: string]: number } = {};
-    transactions.forEach(t => {
-        if (!supplierBalances[t.supplierName]) {
-            supplierBalances[t.supplierName] = 0;
-        }
-        supplierBalances[t.supplierName] += t.amountReceivedFromSupplier - t.totalSellingPrice;
-    });
-    
-    const balance = Object.values(supplierBalances).reduce((acc, cur) => acc + cur, 0);
-
-    return { ...stats, totalSuppliersSalesBalance: balance };
+      },
+      {
+        totalSales: 0,
+        totalPurchases: 0,
+        profitFromTransactions: 0,
+        totalReceivedFromSuppliers: 0,
+        totalPaidToFactory: 0,
+      }
+    );
   }, [transactions]);
   
   const totalExpenses = useMemo(() => expenses.reduce((acc, e) => acc + e.amount, 0), [expenses]);
@@ -968,7 +974,25 @@ export default function AccountingDashboard() {
             </DialogContent>
           </Dialog>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">إجمالي المستلم من الموردين</CardTitle>
+            <Landmark className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{totalReceivedFromSuppliers.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">إجمالي المدفوع للمصنع</CardTitle>
+            <Factory className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{totalPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي المشتريات</CardTitle>
@@ -976,19 +1000,6 @@ export default function AccountingDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalPurchases.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي أرصدة المبيعات</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${totalSuppliersSalesBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
-              {totalSuppliersSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-            </div>
-             <p className="text-xs text-muted-foreground">على أساس (مستلم - مبيعات)</p>
-             <p className="text-xs text-muted-foreground">{totalSuppliersSalesBalance >= 0 ? 'إجمالي عليك للموردين' : 'إجمالي لك عند الموردين'}</p>
           </CardContent>
         </Card>
         <Card>
