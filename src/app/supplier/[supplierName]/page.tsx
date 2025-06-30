@@ -114,7 +114,7 @@ export default function SupplierReportPage() {
       return { ...t, salesRunningBalance: runningSalesBalance, cashFlowRunningBalance: runningCashFlowBalance, factoryRunningBalance: runningFactoryBalance };
     }).sort((a, b) => b.date.getTime() - a.date.getTime());
     
-    const finalFactoryBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].factoryRunningBalance : 0;
+    const finalFactoryBalance = stats.totalPaidToFactory - stats.totalPurchases;
 
     return { 
       transactionsWithBalances, 
