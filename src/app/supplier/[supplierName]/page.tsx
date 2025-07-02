@@ -345,8 +345,11 @@ export default function SupplierReportPage() {
                       <TableCell className="font-medium">{t.description}</TableCell>
                       <TableCell>
                         {`${t.quantity.toLocaleString('ar-EG')} طن`}
-                        {t.category && <span className="text-muted-foreground text-xs mx-1">({t.category})</span>}
-                        {t.variety && <span className="text-muted-foreground text-xs mx-1">({t.variety})</span>}
+                        {(t.category || t.variety) && (
+                          <span className="text-muted-foreground text-xs mx-1">
+                            ({[t.category, t.variety].filter(Boolean).join(' / ')})
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                       <TableCell>
