@@ -25,4 +25,6 @@ export type Expense = {
   date: Date;
   description: string;
   amount: number;
+  paymentOrder?: string;
+  supplierName?: string;
 };

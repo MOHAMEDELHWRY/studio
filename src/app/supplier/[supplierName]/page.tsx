@@ -27,7 +27,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 export default function SupplierReportPage() {
   const router = useRouter();
   const params = useParams();
-  const { transactions, deleteSupplier } = useTransactions();
+  const { transactions, deleteSupplier, expenses } = useTransactions();
   const { toast } = useToast();
 
   const supplierName = useMemo(() => {
@@ -53,7 +53,8 @@ export default function SupplierReportPage() {
     transactionsWithBalances, 
     supplierStats, 
     tonBreakdown, 
-    finalFactoryBalance 
+    finalFactoryBalance,
+    supplierLinkedExpenses,
   } = useMemo(() => {
     let runningFactoryBalance = 0;
 
@@ -112,6 +113,16 @@ export default function SupplierReportPage() {
       }
     });
 
+    const supplierExpensesTotal = expenses
+      .filter(e => e.supplierName === supplierName)
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    stats.totalProfit -= supplierExpensesTotal;
+    
+    const supplierExpensesList = expenses
+      .filter(e => e.supplierName === supplierName)
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+
     const transactionsWithBalances = supplierTransactionsAsc.map(t => {
       runningFactoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
       return { ...t, factoryRunningBalance: runningFactoryBalance };
@@ -124,8 +135,9 @@ export default function SupplierReportPage() {
       supplierStats: stats, 
       tonBreakdown: breakdown,
       finalFactoryBalance,
+      supplierLinkedExpenses: supplierExpensesList,
     };
-  }, [supplierTransactionsAsc]);
+  }, [supplierTransactionsAsc, expenses, supplierName]);
   
   const handleDeleteSupplier = async () => {
     await deleteSupplier(supplierName);
@@ -222,6 +234,7 @@ export default function SupplierReportPage() {
             <div className={`text-2xl font-bold ${supplierStats.totalProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
               {supplierStats.totalProfit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
+             <p className="text-xs text-muted-foreground">بعد خصم المصروفات الخاصة بالمورد</p>
           </CardContent>
         </Card>
         <Card>
@@ -259,6 +272,38 @@ export default function SupplierReportPage() {
           </CardContent>
         </Card>
       </div>
+
+       {supplierLinkedExpenses.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Wallet/> مصروفات خاصة بالمورد</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative w-full overflow-auto">
+              <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>التاريخ</TableHead>
+                    <TableHead>الوصف</TableHead>
+                    <TableHead>أمر الصرف</TableHead>
+                    <TableHead>المبلغ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {supplierLinkedExpenses.map(e => (
+                    <TableRow key={e.id}>
+                      <TableCell>{format(e.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                      <TableCell>{e.description}</TableCell>
+                      <TableCell>{e.paymentOrder || '-'}</TableCell>
+                      <TableCell className="text-destructive">{e.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       <Card className="mb-8">
         <CardHeader>
@@ -384,5 +429,3 @@ export default function SupplierReportPage() {
     </div>
   );
 }
-
-    

@@ -95,6 +95,8 @@ const expenseSchema = z.object({
   date: z.date({ required_error: "التاريخ مطلوب." }),
   description: z.string().trim().min(1, "الوصف مطلوب."),
   amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
+  paymentOrder: z.string().optional(),
+  supplierName: z.string().optional(),
 });
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
@@ -117,6 +119,10 @@ export default function AccountingDashboard() {
   const [isDueDatePopoverOpen, setIsDueDatePopoverOpen] = useState(false);
   const [isExpenseDatePopoverOpen, setIsExpenseDatePopoverOpen] = useState(false);
   const [isFilterDatePopoverOpen, setIsFilterDatePopoverOpen] = useState(false);
+  
+  const supplierNames = useMemo(() => {
+    return Array.from(new Set(transactions.map(t => t.supplierName))).sort();
+  }, [transactions]);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -145,6 +151,8 @@ export default function AccountingDashboard() {
       date: new Date(),
       description: "",
       amount: 0,
+      paymentOrder: "",
+      supplierName: "",
     },
   });
 
@@ -208,6 +216,8 @@ export default function AccountingDashboard() {
         date: new Date(),
         description: "",
         amount: 0,
+        paymentOrder: "",
+        supplierName: "",
       });
     }
     setIsExpenseDialogOpen(true);
@@ -953,8 +963,44 @@ export default function AccountingDashboard() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>الوصف</FormLabel>
+                        <FormLabel>الوصف / سبب الصرف</FormLabel>
                         <FormControl><Input placeholder="مثال: سحب أرباح" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                   <FormField
+                    control={expenseForm.control}
+                    name="paymentOrder"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>أمر الصرف (اختياري)</FormLabel>
+                        <FormControl><Input placeholder="رقم أمر الصرف" {...field} value={field.value ?? ''} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                   <FormField
+                    control={expenseForm.control}
+                    name="supplierName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>خصم من ربح المورد (اختياري)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="اختر موردًا لخصم المصروف من ربحه" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">مصروف عام (لا يوجد مورد)</SelectItem>
+                            {supplierNames.map((name) => (
+                              <SelectItem key={name} value={name}>
+                                {name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1241,6 +1287,8 @@ export default function AccountingDashboard() {
                     <TableRow>
                       <TableHead>التاريخ</TableHead>
                       <TableHead>الوصف</TableHead>
+                      <TableHead>المورد</TableHead>
+                      <TableHead>أمر الصرف</TableHead>
                       <TableHead>المبلغ</TableHead>
                       <TableHead>إجراء</TableHead>
                     </TableRow>
@@ -1251,6 +1299,8 @@ export default function AccountingDashboard() {
                         <TableRow key={e.id}>
                           <TableCell>{format(e.date, 'dd-MM-yy')}</TableCell>
                           <TableCell>{e.description}</TableCell>
+                          <TableCell>{e.supplierName || '-'}</TableCell>
+                          <TableCell>{e.paymentOrder || '-'}</TableCell>
                           <TableCell className="text-destructive">{e.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                           <TableCell>
                             <div className="flex items-center">
@@ -1282,7 +1332,7 @@ export default function AccountingDashboard() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center">لا توجد مصروفات.</TableCell>
+                        <TableCell colSpan={6} className="h-24 text-center">لا توجد مصروفات.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -1295,5 +1345,3 @@ export default function AccountingDashboard() {
     </div>
   );
 }
-
-    
