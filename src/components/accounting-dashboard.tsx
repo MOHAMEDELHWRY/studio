@@ -1082,6 +1082,7 @@ export default function AccountingDashboard() {
                               <TableHead>التاريخ</TableHead>
                               <TableHead>اسم المورد</TableHead>
                               <TableHead>الوصف</TableHead>
+                              <TableHead>الكمية / التفاصيل</TableHead>
                               <TableHead>إجمالي الشراء</TableHead>
                               <TableHead>إجمالي البيع</TableHead>
                               <TableHead>صافي الربح</TableHead>
@@ -1100,6 +1101,14 @@ export default function AccountingDashboard() {
                                       <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
                                   </TableCell>
                                   <TableCell>{t.description}</TableCell>
+                                  <TableCell>
+                                    {`${t.quantity.toLocaleString('ar-EG')} طن`}
+                                    {(t.category || t.variety) && (
+                                      <span className="text-muted-foreground text-xs mx-1">
+                                        ({[t.category, t.variety].filter(Boolean).join(' / ')})
+                                      </span>
+                                    )}
+                                  </TableCell>
                                   <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                   <TableCell>
                                     {t.totalSellingPrice > 0 ? (
@@ -1149,7 +1158,7 @@ export default function AccountingDashboard() {
                               ))
                           ) : (
                               <TableRow>
-                              <TableCell colSpan={10} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                              <TableCell colSpan={11} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                               </TableRow>
                           )}
                           </TableBody>
