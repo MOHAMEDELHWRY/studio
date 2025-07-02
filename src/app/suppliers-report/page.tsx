@@ -61,7 +61,7 @@ export default function SuppliersReportPage() {
       });
 
       const finalSalesBalance = totalReceivedFromSupplier - totalSales;
-      const finalCashFlowBalance = totalReceivedFromSupplier - totalPaidToFactory;
+      const finalCashFlowBalance = totalPaidToFactory - totalSales;
       const finalFactoryBalance = totalPaidToFactory - totalPurchases;
 
       return {
@@ -158,7 +158,7 @@ export default function SuppliersReportPage() {
                       <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
                         {item.finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
                       </TableCell>
-                       <TableCell className={`font-bold ${item.finalCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                       <TableCell className={`font-bold ${item.finalCashFlowBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
                         {item.finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
                       </TableCell>
                       <TableCell className={`font-bold ${item.finalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
