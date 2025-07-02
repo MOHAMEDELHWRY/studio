@@ -1082,6 +1082,7 @@ export default function AccountingDashboard() {
                               <TableHead>التاريخ</TableHead>
                               <TableHead>اسم المورد</TableHead>
                               <TableHead>الوصف</TableHead>
+                              <TableHead>المنطقة</TableHead>
                               <TableHead>الكمية / التفاصيل</TableHead>
                               <TableHead>إجمالي الشراء</TableHead>
                               <TableHead>إجمالي البيع</TableHead>
@@ -1101,6 +1102,7 @@ export default function AccountingDashboard() {
                                       <Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link>
                                   </TableCell>
                                   <TableCell>{t.description}</TableCell>
+                                  <TableCell>{[t.governorate, t.city].filter(Boolean).join(' - ')}</TableCell>
                                   <TableCell>
                                     {`${t.quantity.toLocaleString('ar-EG')} طن`}
                                     {(t.category || t.variety) && (
@@ -1158,7 +1160,7 @@ export default function AccountingDashboard() {
                               ))
                           ) : (
                               <TableRow>
-                              <TableCell colSpan={11} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
+                              <TableCell colSpan={12} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell>
                               </TableRow>
                           )}
                           </TableBody>
@@ -1293,3 +1295,5 @@ export default function AccountingDashboard() {
     </div>
   );
 }
+
+    

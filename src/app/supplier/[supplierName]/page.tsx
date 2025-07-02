@@ -55,8 +55,6 @@ export default function SupplierReportPage() {
     tonBreakdown, 
     finalFactoryBalance 
   } = useMemo(() => {
-    let runningSalesBalance = 0;
-    let runningCashFlowBalance = 0;
     let runningFactoryBalance = 0;
 
     const stats = { 
@@ -115,10 +113,8 @@ export default function SupplierReportPage() {
     });
 
     const transactionsWithBalances = supplierTransactionsAsc.map(t => {
-      runningSalesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-      runningCashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
       runningFactoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
-      return { ...t, salesRunningBalance: runningSalesBalance, cashFlowRunningBalance: runningCashFlowBalance, factoryRunningBalance: runningFactoryBalance };
+      return { ...t, factoryRunningBalance: runningFactoryBalance };
     }).reverse();
     
     const finalFactoryBalance = stats.totalPaidToFactory - stats.totalPurchases;
@@ -328,6 +324,7 @@ export default function SupplierReportPage() {
                 <TableRow>
                   <TableHead>التاريخ</TableHead>
                   <TableHead>الوصف</TableHead>
+                  <TableHead>المنطقة</TableHead>
                   <TableHead>الكمية / التفاصيل</TableHead>
                   <TableHead>إجمالي الشراء</TableHead>
                   <TableHead>إجمالي البيع</TableHead>
@@ -343,6 +340,7 @@ export default function SupplierReportPage() {
                     <TableRow key={t.id}>
                       <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                       <TableCell className="font-medium">{t.description}</TableCell>
+                      <TableCell>{[t.governorate, t.city].filter(Boolean).join(' - ')}</TableCell>
                       <TableCell>
                         {`${t.quantity.toLocaleString('ar-EG')} طن`}
                         {(t.category || t.variety) && (
@@ -373,7 +371,7 @@ export default function SupplierReportPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
+                    <TableCell colSpan={10} className="h-24 text-center">
                       لا توجد عمليات لهذا المورد.
                     </TableCell>
                   </TableRow>
@@ -386,3 +384,5 @@ export default function SupplierReportPage() {
     </div>
   );
 }
+
+    

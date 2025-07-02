@@ -236,6 +236,7 @@ export default function ShareableSupplierReport() {
                   <tr>
                     <th className="p-2 border font-semibold text-gray-700">التاريخ</th>
                     <th className="p-2 border font-semibold text-gray-700">الوصف</th>
+                    <th className="p-2 border font-semibold text-gray-700">المنطقة</th>
                     <th className="p-2 border font-semibold text-gray-700">الكمية / التفاصيل</th>
                     <th className="p-2 border font-semibold text-gray-700">إجمالي الشراء</th>
                     <th className="p-2 border font-semibold text-gray-700">إجمالي البيع</th>
@@ -252,6 +253,7 @@ export default function ShareableSupplierReport() {
                       <tr key={t.id} className="border-b hover:bg-gray-50">
                         <td className="p-2 border whitespace-nowrap">{format(t.date, 'dd-MM-yyyy', { locale: ar })}</td>
                         <td className="p-2 border font-medium">{t.description}</td>
+                        <td className="p-2 border whitespace-nowrap">{[t.governorate, t.city].filter(Boolean).join(' - ')}</td>
                         <td className="p-2 border whitespace-nowrap">{`${t.quantity.toLocaleString('ar-EG')} طن`}{(t.category || t.variety) ? ` (${[t.category, t.variety].filter(Boolean).join(' / ')})` : ''}</td>
                         <td className="p-2 border whitespace-nowrap">{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
                         <td className="p-2 border whitespace-nowrap">
@@ -270,7 +272,7 @@ export default function ShareableSupplierReport() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={10} className="p-12 text-center text-gray-500 border">
+                      <td colSpan={11} className="p-12 text-center text-gray-500 border">
                         لا توجد عمليات لهذا المورد.
                       </td>
                     </tr>
@@ -287,3 +289,5 @@ export default function ShareableSupplierReport() {
     </div>
   );
 }
+
+    
