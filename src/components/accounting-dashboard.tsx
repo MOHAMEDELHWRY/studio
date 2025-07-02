@@ -329,27 +329,40 @@ export default function AccountingDashboard() {
     totalReceivedFromSuppliers,
     totalPaidToFactory,
   } = useMemo(() => {
-    return transactions.reduce(
+    const aggregates = transactions.reduce(
       (acc, t) => {
         acc.totalSales += t.totalSellingPrice;
         acc.totalPurchases += t.totalPurchasePrice;
-        acc.profitFromTransactions += t.profit;
         acc.totalReceivedFromSuppliers += t.amountReceivedFromSupplier;
         acc.totalPaidToFactory += t.amountPaidToFactory;
+        if (t.totalSellingPrice > 0) {
+          acc.totalTaxesOnSoldItems += t.taxes;
+        }
         return acc;
       },
       {
         totalSales: 0,
         totalPurchases: 0,
-        profitFromTransactions: 0,
         totalReceivedFromSuppliers: 0,
         totalPaidToFactory: 0,
+        totalTaxesOnSoldItems: 0,
       }
     );
+
+    const profitBeforeExpenses = aggregates.totalSales - aggregates.totalPurchases - aggregates.totalTaxesOnSoldItems;
+
+    return {
+      totalSales: aggregates.totalSales,
+      totalPurchases: aggregates.totalPurchases,
+      totalReceivedFromSuppliers: aggregates.totalReceivedFromSuppliers,
+      totalPaidToFactory: aggregates.totalPaidToFactory,
+      profitFromTransactions: profitBeforeExpenses,
+    };
   }, [transactions]);
   
   const totalExpenses = useMemo(() => expenses.reduce((acc, e) => acc + e.amount, 0), [expenses]);
   const totalProfit = profitFromTransactions - totalExpenses;
+
 
   const chartData = useMemo(() => {
     const monthlyData: { [key: string]: { profit: number } } = {};
