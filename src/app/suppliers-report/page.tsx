@@ -25,11 +25,16 @@ import {
 interface SupplierSummary {
   supplierName: string;
   totalSales: number;
+  totalPurchases: number;
+  totalReceivedFromSupplier: number;
+  totalQuantityPurchased: number;
+  remainingQuantity: number;
   finalSalesBalance: number;
   finalCashFlowBalance: number;
   finalFactoryBalance: number;
   transactionCount: number;
 }
+
 
 export default function SuppliersReportPage() {
   const { transactions, deleteSupplier } = useTransactions();
@@ -52,21 +57,33 @@ export default function SuppliersReportPage() {
       let totalPurchases = 0;
       let totalPaidToFactory = 0;
       let totalReceivedFromSupplier = 0;
+      let totalQuantityPurchased = 0;
+      let totalQuantitySold = 0;
+
 
       supplierTransactions.forEach(t => {
         totalSales += t.totalSellingPrice;
         totalPurchases += t.totalPurchasePrice;
         totalPaidToFactory += t.amountPaidToFactory;
         totalReceivedFromSupplier += t.amountReceivedFromSupplier;
+        totalQuantityPurchased += t.quantity;
+        if (t.totalSellingPrice > 0) {
+            totalQuantitySold += t.quantity;
+        }
       });
 
       const finalSalesBalance = totalReceivedFromSupplier - totalSales;
       const finalCashFlowBalance = totalPaidToFactory - totalSales;
       const finalFactoryBalance = totalPaidToFactory - totalPurchases;
+      const remainingQuantity = totalQuantityPurchased - totalQuantitySold;
 
       return {
         supplierName,
         totalSales,
+        totalPurchases,
+        totalReceivedFromSupplier,
+        totalQuantityPurchased,
+        remainingQuantity,
         finalSalesBalance,
         finalCashFlowBalance,
         finalFactoryBalance,
@@ -132,11 +149,15 @@ export default function SuppliersReportPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>اسم المورد</TableHead>
+                  <TableHead>مبلغ المشتريات</TableHead>
                   <TableHead>إجمالي المبيعات</TableHead>
-                  <TableHead>عدد العمليات</TableHead>
+                  <TableHead>المستلم من المورد</TableHead>
+                  <TableHead>الكمية المشتراة (طن)</TableHead>
+                  <TableHead>الكمية المتبقية (طن)</TableHead>
                   <TableHead>رصيد المبيعات</TableHead>
                   <TableHead>الرصيد النقدي</TableHead>
                   <TableHead>رصيد لدى المصنع</TableHead>
+                  <TableHead>عدد العمليات</TableHead>
                   <TableHead>إجراءات</TableHead>
                 </TableRow>
               </TableHeader>
@@ -149,11 +170,20 @@ export default function SuppliersReportPage() {
                            {item.supplierName}
                          </Link>
                       </TableCell>
+                       <TableCell>
+                        {item.totalPurchases.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+                      </TableCell>
                       <TableCell>
                         {item.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
                       </TableCell>
+                       <TableCell className="text-success">
+                        {item.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+                      </TableCell>
                       <TableCell>
-                        {item.transactionCount}
+                        {item.totalQuantityPurchased.toLocaleString('ar-EG')}
+                      </TableCell>
+                       <TableCell>
+                        {item.remainingQuantity.toLocaleString('ar-EG')}
                       </TableCell>
                       <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
                         {item.finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
@@ -163,6 +193,9 @@ export default function SuppliersReportPage() {
                       </TableCell>
                       <TableCell className={`font-bold ${item.finalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
                         {item.finalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+                      </TableCell>
+                      <TableCell>
+                        {item.transactionCount}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -205,7 +238,7 @@ export default function SuppliersReportPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
+                    <TableCell colSpan={11} className="h-24 text-center">
                       لا يوجد موردين لعرضهم. قم بإضافة عمليات أولاً.
                     </TableCell>
                   </TableRow>
