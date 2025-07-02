@@ -72,7 +72,7 @@ export default function SuppliersReportPage() {
         }
       });
 
-      const finalSalesBalance = totalReceivedFromSupplier - totalSales;
+      const finalSalesBalance = totalSales - totalReceivedFromSupplier;
       const finalCashFlowBalance = totalPaidToFactory - totalSales;
       const finalFactoryBalance = totalPaidToFactory - totalPurchases;
       const remainingQuantity = totalQuantityPurchased - totalQuantitySold;
@@ -185,7 +185,7 @@ export default function SuppliersReportPage() {
                        <TableCell>
                         {item.remainingQuantity.toLocaleString('ar-EG')}
                       </TableCell>
-                      <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
+                      <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
                         {item.finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
                       </TableCell>
                        <TableCell className={`font-bold ${item.finalCashFlowBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
