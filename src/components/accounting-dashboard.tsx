@@ -986,14 +986,17 @@ export default function AccountingDashboard() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>خصم من ربح المورد (اختياري)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                        <Select
+                          onValueChange={(value) => field.onChange(value === '__general__' ? '' : value)}
+                          value={field.value || '__general__'}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="اختر موردًا لخصم المصروف من ربحه" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">مصروف عام (لا يوجد مورد)</SelectItem>
+                            <SelectItem value="__general__">مصروف عام (لا يوجد مورد)</SelectItem>
                             {supplierNames.map((name) => (
                               <SelectItem key={name} value={name}>
                                 {name}
