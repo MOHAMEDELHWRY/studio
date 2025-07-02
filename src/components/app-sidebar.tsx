@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BookUser, LineChart, Factory, Users, SidebarClose, LogOut } from 'lucide-react';
+import { BookUser, LineChart, Factory, Users, SidebarClose, LogOut, Wallet } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
@@ -47,6 +47,7 @@ export function AppSidebar() {
     { href: '/suppliers-report', label: 'تقرير الموردين', icon: Users, isActive: () => pathname === '/suppliers-report' || pathname.startsWith('/supplier/') },
     { href: '/factory-report', label: 'تقرير المصنع', icon: Factory, isActive: () => pathname === '/factory-report' },
     { href: '/reports', label: 'تقارير المبيعات', icon: LineChart, isActive: () => pathname === '/reports' },
+    { href: '/expenses-report', label: 'تقرير المصروفات', icon: Wallet, isActive: () => pathname === '/expenses-report' },
   ];
 
   return (
