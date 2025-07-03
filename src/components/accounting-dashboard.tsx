@@ -335,7 +335,10 @@ export default function AccountingDashboard() {
         acc.totalPurchases += t.totalPurchasePrice;
         acc.totalReceivedFromSuppliers += t.amountReceivedFromSupplier;
         acc.totalPaidToFactory += t.amountPaidToFactory;
-        if (t.totalSellingPrice > 0) {
+
+        const isSold = t.totalSellingPrice > 0;
+        if (isSold) {
+          acc.costOfGoodsSold += t.totalPurchasePrice;
           acc.totalTaxesOnSoldItems += t.taxes;
         }
         return acc;
@@ -343,13 +346,14 @@ export default function AccountingDashboard() {
       {
         totalSales: 0,
         totalPurchases: 0,
+        costOfGoodsSold: 0,
         totalReceivedFromSuppliers: 0,
         totalPaidToFactory: 0,
         totalTaxesOnSoldItems: 0,
       }
     );
 
-    const profitBeforeExpenses = aggregates.totalSales - aggregates.totalPurchases - aggregates.totalTaxesOnSoldItems;
+    const profitBeforeExpenses = aggregates.totalSales - aggregates.costOfGoodsSold - aggregates.totalTaxesOnSoldItems;
 
     return {
       totalSales: aggregates.totalSales,
