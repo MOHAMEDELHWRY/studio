@@ -28,3 +28,13 @@ export type Expense = {
   paymentOrder?: string;
   supplierName?: string;
 };
+
+export type BalanceTransfer = {
+  id: string;
+  date: Date;
+  amount: number;
+  fromSupplier: string;
+  toSupplier: string;
+  reason: string;
+  method: string;
+};

@@ -10,7 +10,7 @@ import { Printer } from 'lucide-react';
 
 export default function SimplifiedSalesReport() {
   const params = useParams();
-  const { transactions } = useTransactions();
+  const { transactions, balanceTransfers } = useTransactions();
 
   const supplierName = useMemo(() => {
     const name = params.supplierName;
@@ -28,6 +28,12 @@ export default function SimplifiedSalesReport() {
     const supplierTransactionsAsc = transactions
       .filter(t => t.supplierName === supplierName)
       .sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    const transferAdjustment = balanceTransfers.reduce((acc, t) => {
+        if (t.toSupplier === supplierName) return acc + t.amount;
+        if (t.fromSupplier === supplierName) return acc - t.amount;
+        return acc;
+    }, 0);
       
     const stats = supplierTransactionsAsc.reduce((acc, t) => {
       acc.totalSales += t.totalSellingPrice;
@@ -38,16 +44,18 @@ export default function SimplifiedSalesReport() {
       totalReceivedFromSupplier: 0,
     });
     
-    let salesBalance = 0;
+    stats.totalReceivedFromSupplier += transferAdjustment;
+    
+    let salesBalance = transferAdjustment; // Start balance with transfers not linked to a transaction date
     const balances = supplierTransactionsAsc.map(t => {
       salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
       return { ...t, salesRunningBalance: salesBalance };
     }).sort((a, b) => b.date.getTime() - a.date.getTime());
 
     return { transactionsWithBalances: balances, supplierStats: stats };
-  }, [transactions, supplierName]);
+  }, [transactions, supplierName, balanceTransfers]);
 
-  const finalSalesBalance = transactionsWithBalances.length > 0 ? transactionsWithBalances[0].salesRunningBalance : 0;
+  const finalSalesBalance = supplierStats.totalReceivedFromSupplier - supplierStats.totalSales;
 
   if (!supplierName) {
     return (
@@ -90,7 +98,7 @@ export default function SimplifiedSalesReport() {
           <h2 className="text-lg font-bold mb-4 border-b pb-2">ملخص رصيد المبيعات</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
               <div className="p-2 sm:p-4 border rounded-lg">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم من المورد</h3>
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم (بعد التحويلات)</h3>
                   <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { type Transaction, type Expense } from '@/types';
+import { type Transaction, type Expense, type BalanceTransfer } from '@/types';
 import { db } from '@/lib/firebase';
 import { 
   collection, 
@@ -27,6 +27,10 @@ interface TransactionsContextType {
   addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
   updateExpense: (updatedExpense: Expense) => Promise<void>;
   deleteExpense: (expenseId: string) => Promise<void>;
+  balanceTransfers: BalanceTransfer[];
+  addBalanceTransfer: (transfer: Omit<BalanceTransfer, 'id'>) => Promise<void>;
+  updateBalanceTransfer: (updatedTransfer: BalanceTransfer) => Promise<void>;
+  deleteBalanceTransfer: (transferId: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -36,6 +40,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [balanceTransfers, setBalanceTransfers] = useState<BalanceTransfer[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -44,6 +49,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       if (!currentUser) {
         setTransactions([]);
         setExpenses([]);
+        setBalanceTransfers([]);
         setLoading(false);
         return;
       }
@@ -51,6 +57,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       try {
         const transactionsCollectionRef = collection(db, 'users', currentUser.uid, 'transactions');
         const expensesCollectionRef = collection(db, 'users', currentUser.uid, 'expenses');
+        const balanceTransfersCollectionRef = collection(db, 'users', currentUser.uid, 'balanceTransfers');
         
         // Fetch transactions
         const transactionSnapshot = await getDocs(transactionsCollectionRef);
@@ -77,6 +84,18 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
           } as Expense;
         });
         setExpenses(fetchedExpenses.sort((a, b) => b.date.getTime() - a.date.getTime()));
+
+        // Fetch balance transfers
+        const transferSnapshot = await getDocs(balanceTransfersCollectionRef);
+        const fetchedTransfers = transferSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            ...data,
+            id: doc.id,
+            date: new Date(data.date),
+          } as BalanceTransfer;
+        });
+        setBalanceTransfers(fetchedTransfers.sort((a, b) => b.date.getTime() - a.date.getTime()));
 
       } catch (error) {
         console.error("Could not fetch data from Firestore", error);
@@ -226,8 +245,66 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addBalanceTransfer = async (transfer: Omit<BalanceTransfer, 'id'>) => {
+    if (!currentUser) return;
+    try {
+      const transfersCollectionRef = collection(db, 'users', currentUser.uid, 'balanceTransfers');
+      const docData = {
+        ...transfer,
+        date: transfer.date.toISOString(),
+      };
+      const docRef = await addDoc(transfersCollectionRef, docData);
+      setBalanceTransfers(prev => [{ ...transfer, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
+    } catch (error) {
+      console.error("Error adding balance transfer: ", error);
+      toast({ title: "خطأ", description: "لم نتمكن من إضافة عملية التحويل.", variant: "destructive" });
+    }
+  };
+
+  const updateBalanceTransfer = async (updatedTransfer: BalanceTransfer) => {
+    if (!currentUser) return;
+    try {
+      const { id, ...dataToUpdate } = updatedTransfer;
+      const transferDoc = doc(db, 'users', currentUser.uid, 'balanceTransfers', id);
+      const docData = {
+        ...dataToUpdate,
+        date: updatedTransfer.date.toISOString(),
+      };
+      await updateDoc(transferDoc, docData);
+      setBalanceTransfers(prev =>
+        prev.map(t => (t.id === updatedTransfer.id ? updatedTransfer : t))
+          .sort((a, b) => b.date.getTime() - a.date.getTime())
+      );
+    } catch (error) {
+      console.error("Error updating balance transfer: ", error);
+      toast({ title: "خطأ", description: "لم نتمكن من تعديل عملية التحويل.", variant: "destructive" });
+    }
+  };
+
+  const deleteBalanceTransfer = async (transferId: string) => {
+    if (!currentUser) return;
+    try {
+      const transferDoc = doc(db, 'users', currentUser.uid, 'balanceTransfers', transferId);
+      await deleteDoc(transferDoc);
+      setBalanceTransfers(prev => prev.filter(t => t.id !== transferId));
+      toast({
+        title: "تم الحذف",
+        description: "تم حذف عملية التحويل بنجاح.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error deleting balance transfer: ", error);
+      toast({ title: "خطأ", description: "لم نتمكن من حذف عملية التحويل.", variant: "destructive" });
+    }
+  };
+
   return (
-    <TransactionsContext.Provider value={{ transactions, addTransaction, updateTransaction, deleteTransaction, deleteSupplier, expenses, addExpense, updateExpense, deleteExpense, loading }}>
+    <TransactionsContext.Provider value={{ 
+      transactions, addTransaction, updateTransaction, deleteTransaction, deleteSupplier, 
+      expenses, addExpense, updateExpense, deleteExpense,
+      balanceTransfers, addBalanceTransfer, updateBalanceTransfer, deleteBalanceTransfer,
+      loading 
+    }}>
       {children}
     </TransactionsContext.Provider>
   );

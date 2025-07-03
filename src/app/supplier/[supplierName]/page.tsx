@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { DollarSign, Package, Trash2, Factory, LineChart, Share2, Landmark, Warehouse, FileText, Wallet } from 'lucide-react';
+import { DollarSign, Package, Trash2, Factory, LineChart, Share2, Landmark, Warehouse, FileText, Wallet, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -27,7 +27,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 export default function SupplierReportPage() {
   const router = useRouter();
   const params = useParams();
-  const { transactions, deleteSupplier, expenses } = useTransactions();
+  const { transactions, deleteSupplier, expenses, balanceTransfers } = useTransactions();
   const { toast } = useToast();
 
   const supplierName = useMemo(() => {
@@ -48,6 +48,12 @@ export default function SupplierReportPage() {
         return a.id.localeCompare(b.id);
       });
   }, [transactions, supplierName]);
+
+  const supplierRelatedTransfers = useMemo(() => {
+    return balanceTransfers
+      .filter(t => t.fromSupplier === supplierName || t.toSupplier === supplierName)
+      .sort((a,b) => b.date.getTime() - a.date.getTime());
+  }, [balanceTransfers, supplierName]);
   
   const { 
     transactionsWithBalances, 
@@ -126,6 +132,14 @@ export default function SupplierReportPage() {
 
     stats.totalProfit = stats.totalSales - costOfGoodsSold - totalTaxesOnSoldItems - supplierExpensesTotal;
     
+    const transferAdjustment = supplierRelatedTransfers.reduce((acc, t) => {
+        if (t.toSupplier === supplierName) return acc + t.amount;
+        if (t.fromSupplier === supplierName) return acc - t.amount;
+        return acc;
+    }, 0);
+
+    stats.totalReceivedFromSupplier += transferAdjustment;
+
     const supplierExpensesList = expenses
       .filter(e => e.supplierName === supplierName)
       .sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -144,7 +158,7 @@ export default function SupplierReportPage() {
       finalFactoryBalance,
       supplierLinkedExpenses: supplierExpensesList,
     };
-  }, [supplierTransactionsAsc, expenses, supplierName]);
+  }, [supplierTransactionsAsc, expenses, supplierName, supplierRelatedTransfers]);
   
   const handleDeleteSupplier = async () => {
     await deleteSupplier(supplierName);
@@ -257,7 +271,7 @@ export default function SupplierReportPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المستلم من المورد</CardTitle>
+            <CardTitle className="text-sm font-medium">إجمالي المستلم (بعد التحويلات)</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -303,6 +317,44 @@ export default function SupplierReportPage() {
                       <TableCell>{e.description}</TableCell>
                       <TableCell>{e.paymentOrder || '-'}</TableCell>
                       <TableCell className="text-destructive">{e.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {supplierRelatedTransfers.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><ArrowRightLeft/> تحويلات الرصيد الخاصة بالمورد</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative w-full overflow-auto">
+              <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>التاريخ</TableHead>
+                    <TableHead>نوع التحويل</TableHead>
+                    <TableHead>المورد الآخر</TableHead>
+                    <TableHead>المبلغ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {supplierRelatedTransfers.map(t => (
+                    <TableRow key={t.id}>
+                      <TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                      <TableCell>
+                        {t.fromSupplier === supplierName ? (
+                          <span className="font-bold text-destructive">تحويل من رصيدك</span>
+                        ) : (
+                          <span className="font-bold text-success">تحويل إلى رصيدك</span>
+                        )}
+                      </TableCell>
+                       <TableCell>{t.fromSupplier === supplierName ? t.toSupplier : t.fromSupplier}</TableCell>
+                      <TableCell className="font-bold">{t.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

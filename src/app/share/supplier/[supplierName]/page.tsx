@@ -10,7 +10,7 @@ import { Printer } from 'lucide-react';
 
 export default function ShareableSupplierReport() {
   const params = useParams();
-  const { transactions } = useTransactions();
+  const { transactions, balanceTransfers } = useTransactions();
 
   const supplierName = useMemo(() => {
     const name = params.supplierName;
@@ -30,6 +30,12 @@ export default function ShareableSupplierReport() {
         return a.id.localeCompare(b.id);
       });
   }, [transactions, supplierName]);
+
+  const supplierRelatedTransfers = useMemo(() => {
+    return balanceTransfers
+      .filter(t => t.fromSupplier === supplierName || t.toSupplier === supplierName)
+      .sort((a,b) => b.date.getTime() - a.date.getTime());
+  }, [balanceTransfers, supplierName]);
   
   const { 
     transactionsWithBalances, 
@@ -96,22 +102,63 @@ export default function ShareableSupplierReport() {
       }
     });
 
+    const transferAdjustment = supplierRelatedTransfers.reduce((acc, t) => {
+        if (t.toSupplier === supplierName) return acc + t.amount;
+        if (t.fromSupplier === supplierName) return acc - t.amount;
+        return acc;
+    }, 0);
+
+    const finalSalesBalance = (stats.totalReceivedFromSupplier + transferAdjustment) - stats.totalSales;
+    const finalCashFlowBalance = (stats.totalReceivedFromSupplier + transferAdjustment) - stats.totalPaidToFactory;
+    const finalFactoryBalance = stats.totalPaidToFactory - stats.totalPurchases;
+
+    // Apply adjustment for display
+    stats.totalReceivedFromSupplier += transferAdjustment;
+
+    // Create a combined list of transactions and transfers for running balance calculation
+    const combinedEvents = [
+        ...supplierTransactionsAsc.map(t => ({...t, type: 'transaction'})),
+        ...supplierRelatedTransfers.map(t => ({...t, type: 'transfer'}))
+    ].sort((a,b) => a.date.getTime() - b.date.getTime());
+
+    let runningSales = 0;
+    let runningCash = 0;
+    let runningFactory = 0;
+    const eventBalances = new Map<string, { sales: number; cash: number; factory: number }>();
+    
+    combinedEvents.forEach(event => {
+        if (event.type === 'transaction') {
+            runningSales += event.amountReceivedFromSupplier - event.totalSellingPrice;
+            runningCash += event.amountReceivedFromSupplier - event.amountPaidToFactory;
+            runningFactory += event.amountPaidToFactory - event.totalPurchasePrice;
+        } else if (event.type === 'transfer') {
+            const amount = event.toSupplier === supplierName ? event.amount : -event.amount;
+            runningSales += amount;
+            runningCash += amount;
+        }
+        eventBalances.set(event.id, { sales: runningSales, cash: runningCash, factory: runningFactory });
+    });
+
+
     const transactionsWithBalances = supplierTransactionsAsc.map(t => {
-      runningSalesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-      runningCashFlowBalance += t.amountReceivedFromSupplier - t.amountPaidToFactory;
-      runningFactoryBalance += t.amountPaidToFactory - t.totalPurchasePrice;
-      return { ...t, salesRunningBalance: runningSalesBalance, cashFlowRunningBalance: runningCashFlowBalance, factoryRunningBalance: runningFactoryBalance };
+      const balances = eventBalances.get(t.id) || { sales: 0, cash: 0, factory: 0 };
+      return { 
+          ...t, 
+          salesRunningBalance: balances.sales, 
+          cashFlowRunningBalance: balances.cash, 
+          factoryRunningBalance: balances.factory 
+      };
     }).reverse();
 
     return { 
       transactionsWithBalances, 
       supplierStats: stats, 
       tonBreakdown: breakdown,
-      finalSalesBalance: stats.totalReceivedFromSupplier - stats.totalSales,
-      finalCashFlowBalance: stats.totalReceivedFromSupplier - stats.totalPaidToFactory,
-      finalFactoryBalance: stats.totalPaidToFactory - stats.totalPurchases,
+      finalSalesBalance,
+      finalCashFlowBalance,
+      finalFactoryBalance,
     };
-  }, [supplierTransactionsAsc]);
+  }, [supplierTransactionsAsc, supplierRelatedTransfers, supplierName]);
 
 
   if (!supplierName) {
@@ -163,7 +210,7 @@ export default function ShareableSupplierReport() {
                   <p className="text-base sm:text-xl font-bold text-gray-800">{supplierStats.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
                <div className="p-2 sm:p-4 border rounded-lg">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم من المورد</h3>
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم (بعد التحويلات)</h3>
                   <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">
@@ -180,6 +227,40 @@ export default function ShareableSupplierReport() {
               </div>
           </div>
         </section>
+
+        {supplierRelatedTransfers.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-lg font-bold mb-4 border-b pb-2">سجل التحويلات</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs sm:text-sm text-right border-collapse border">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="p-2 border font-semibold text-gray-700">التاريخ</th>
+                      <th className="p-2 border font-semibold text-gray-700">البيان</th>
+                      <th className="p-2 border font-semibold text-gray-700">المبلغ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {supplierRelatedTransfers.map(t => (
+                      <tr key={t.id}>
+                          <td className="p-2 border whitespace-nowrap">{format(t.date, 'dd-MM-yyyy', { locale: ar })}</td>
+                          <td className="p-2 border">
+                            {t.fromSupplier === supplierName 
+                              ? `تحويل إلى ${t.toSupplier}`
+                              : `تحويل من ${t.fromSupplier}`
+                            }
+                          </td>
+                           <td className={'p-2 border whitespace-nowrap font-bold ' + (t.toSupplier === supplierName ? 'text-green-600' : 'text-red-600')}>
+                              {t.toSupplier === supplierName ? '+' : '-'}
+                              {t.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+                           </td>
+                      </tr>
+                    ))}
+                  </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         <section className="mb-8">
           <h2 className="text-lg font-bold mb-4 border-b pb-2">ملخص الأطنان</h2>
@@ -289,5 +370,3 @@ export default function ShareableSupplierReport() {
     </div>
   );
 }
-
-    
