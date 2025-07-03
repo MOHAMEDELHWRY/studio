@@ -8,8 +8,8 @@ import * as z from 'zod';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { Users, Factory, Share2, FileText, Trash2, ArrowRightLeft, Calendar as CalendarIcon, Plus } from 'lucide-react';
-import { type Transaction } from '@/types';
+import { Users, Factory, Share2, FileText, Trash2, ArrowRightLeft, Calendar as CalendarIcon, Plus, Landmark } from 'lucide-react';
+import { type Transaction, type SupplierPayment } from '@/types';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface SupplierSummary {
   supplierName: string;
@@ -69,11 +70,25 @@ const transferSchema = z.object({
 });
 type TransferFormValues = z.infer<typeof transferSchema>;
 
+const paymentSchema = z.object({
+  date: z.date({ required_error: "التاريخ مطلوب." }),
+  amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
+  supplierName: z.string().min(1, "يجب اختيار المورد."),
+  method: z.enum(['نقدي', 'بنكي'], { required_error: "طريقة التحويل مطلوبة." }),
+  sourceBank: z.string().optional(),
+  destinationBank: z.string().optional(),
+  reason: z.string().trim().min(1, "يجب كتابة سبب الصرف."),
+  responsiblePerson: z.string().trim().min(1, "يجب تحديد القائم بالتحويل."),
+  documentUrl: z.string().url({ message: "الرجاء إدخال رابط صالح." }).optional().or(z.literal('')),
+});
+type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 export default function SuppliersReportPage() {
-  const { transactions, deleteSupplier, balanceTransfers, addBalanceTransfer } = useTransactions();
+  const { transactions, deleteSupplier, balanceTransfers, addBalanceTransfer, supplierPayments, addSupplierPayment, deleteSupplierPayment } = useTransactions();
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [isTransferDatePopoverOpen, setIsTransferDatePopoverOpen] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isPaymentDatePopoverOpen, setIsPaymentDatePopoverOpen] = useState(false);
 
   const supplierNames = useMemo(() => {
     return Array.from(new Set(transactions.map(t => t.supplierName))).sort();
@@ -81,15 +96,14 @@ export default function SuppliersReportPage() {
 
   const transferForm = useForm<TransferFormValues>({
     resolver: zodResolver(transferSchema),
-    defaultValues: {
-      date: new Date(),
-      amount: 0,
-      fromSupplier: "",
-      toSupplier: "",
-      reason: "",
-      method: "تحويل بنكي",
-    },
+    defaultValues: { date: new Date(), amount: 0, fromSupplier: "", toSupplier: "", reason: "", method: "تحويل بنكي" },
   });
+
+  const paymentForm = useForm<PaymentFormValues>({
+    resolver: zodResolver(paymentSchema),
+    defaultValues: { date: new Date(), amount: 0, supplierName: "", method: 'نقدي', reason: "", responsiblePerson: "" },
+  });
+  const paymentMethodWatcher = paymentForm.watch('method');
 
   const onSubmitTransfer = async (values: TransferFormValues) => {
     await addBalanceTransfer(values);
@@ -97,13 +111,16 @@ export default function SuppliersReportPage() {
     setIsTransferDialogOpen(false);
   };
 
+  const onSubmitPayment = async (values: PaymentFormValues) => {
+    await addSupplierPayment(values);
+    paymentForm.reset();
+    setIsPaymentDialogOpen(false);
+  };
+
   const supplierSummaries = useMemo(() => {
     const supplierData: { [key: string]: Transaction[] } = {};
-
     transactions.forEach(t => {
-      if (!supplierData[t.supplierName]) {
-        supplierData[t.supplierName] = [];
-      }
+      if (!supplierData[t.supplierName]) supplierData[t.supplierName] = [];
       supplierData[t.supplierName].push(t);
     });
 
@@ -113,367 +130,242 @@ export default function SuppliersReportPage() {
       transferAdjustments.set(transfer.toSupplier, (transferAdjustments.get(transfer.toSupplier) || 0) + transfer.amount);
     });
 
+    const paymentAdjustments = new Map<string, number>();
+    supplierPayments.forEach(payment => {
+      paymentAdjustments.set(payment.supplierName, (paymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
+    });
+
     const summaries: SupplierSummary[] = Object.keys(supplierData).map(supplierName => {
       const supplierTransactions = supplierData[supplierName];
-      
-      let totalSales = 0;
-      let totalPurchases = 0;
-      let totalPaidToFactory = 0;
-      let totalReceivedFromSupplier = 0;
-      let totalQuantityPurchased = 0;
-      let totalQuantitySold = 0;
-      let remainingStockValue = 0;
-
-
+      let totalSales = 0, totalPurchases = 0, totalPaidToFactory = 0, totalReceivedFromSupplier = 0, totalQuantityPurchased = 0, totalQuantitySold = 0, remainingStockValue = 0;
       supplierTransactions.forEach(t => {
         totalSales += t.totalSellingPrice;
         totalPurchases += t.totalPurchasePrice;
         totalPaidToFactory += t.amountPaidToFactory;
         totalReceivedFromSupplier += t.amountReceivedFromSupplier;
         totalQuantityPurchased += t.quantity;
-        if (t.totalSellingPrice > 0) {
-            totalQuantitySold += t.quantity;
-        } else {
-            remainingStockValue += t.totalPurchasePrice;
-        }
+        if (t.totalSellingPrice > 0) totalQuantitySold += t.quantity;
+        else remainingStockValue += t.totalPurchasePrice;
       });
       
-      const adjustment = transferAdjustments.get(supplierName) || 0;
-      const adjustedTotalReceived = totalReceivedFromSupplier + adjustment;
+      const transferAdj = transferAdjustments.get(supplierName) || 0;
+      const paymentAdj = paymentAdjustments.get(supplierName) || 0;
+      const adjustedTotalReceived = totalReceivedFromSupplier + transferAdj - paymentAdj;
 
       const finalSalesBalance = adjustedTotalReceived - totalSales;
-      const finalCashFlowBalance = totalPaidToFactory - totalSales;
+      const finalCashFlowBalance = adjustedTotalReceived - totalPaidToFactory;
       const finalFactoryBalance = totalPaidToFactory - totalPurchases;
       const remainingQuantity = totalQuantityPurchased - totalQuantitySold;
 
       return {
-        supplierName,
-        totalSales,
-        totalPurchases,
-        totalReceivedFromSupplier: adjustedTotalReceived,
-        totalQuantityPurchased,
-        remainingQuantity,
-        remainingStockValue,
-        finalSalesBalance,
-        finalCashFlowBalance,
-        finalFactoryBalance,
+        supplierName, totalSales, totalPurchases, totalReceivedFromSupplier: adjustedTotalReceived, totalQuantityPurchased,
+        remainingQuantity, remainingStockValue, finalSalesBalance, finalCashFlowBalance, finalFactoryBalance,
         transactionCount: supplierTransactions.length,
       };
     });
-
     return summaries.sort((a, b) => b.totalSales - a.totalSales);
-  }, [transactions, balanceTransfers]);
+  }, [transactions, balanceTransfers, supplierPayments]);
   
   const { totalSuppliers, totalFactoryBalance } = useMemo(() => {
     const factoryBalance = supplierSummaries.reduce((acc, curr) => acc + curr.finalFactoryBalance, 0);
-    return {
-      totalSuppliers: supplierSummaries.length,
-      totalFactoryBalance: factoryBalance,
-    };
+    return { totalSuppliers: supplierSummaries.length, totalFactoryBalance: factoryBalance };
   }, [supplierSummaries]);
 
-  const sortedTransfers = useMemo(() => {
-      return [...balanceTransfers].sort((a,b) => b.date.getTime() - a.date.getTime());
-  }, [balanceTransfers]);
-
+  const sortedTransfers = useMemo(() => [...balanceTransfers].sort((a,b) => b.date.getTime() - a.date.getTime()), [balanceTransfers]);
+  const sortedPayments = useMemo(() => [...supplierPayments].sort((a,b) => b.date.getTime() - a.date.getTime()), [supplierPayments]);
 
   return (
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div className="flex items-center gap-2">
           <SidebarTrigger />
-          <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
-            <Users className="w-8 h-8" />
-            تقرير الموردين
-          </h1>
+          <h1 className="text-3xl font-bold text-primary flex items-center gap-2"><Users className="w-8 h-8" />تقرير الموردين</h1>
         </div>
-        <Button onClick={() => setIsTransferDialogOpen(true)}>
-          <ArrowRightLeft className="ml-2 h-4 w-4" />
-          تحويل رصيد بين الموردين
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setIsPaymentDialogOpen(true)}>
+            <Landmark className="ml-2 h-4 w-4" />
+            تسجيل دفعة لمورد
+          </Button>
+          <Button onClick={() => setIsTransferDialogOpen(true)}>
+            <ArrowRightLeft className="ml-2 h-4 w-4" />
+            تحويل رصيد بين الموردين
+          </Button>
+        </div>
       </header>
       
+      {/* Payment Dialog */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader><DialogTitle>تسجيل دفعة لمورد</DialogTitle></DialogHeader>
+          <Form {...paymentForm}>
+            <form onSubmit={paymentForm.handleSubmit(onSubmitPayment)} className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={paymentForm.control} name="date" render={({ field }) => (
+                  <FormItem className="flex flex-col"><FormLabel>تاريخ الصرف</FormLabel>
+                    <Popover modal={false} open={isPaymentDatePopoverOpen} onOpenChange={setIsPaymentDatePopoverOpen}>
+                      <PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}>
+                        <CalendarIcon className="ml-2 h-4 w-4" />
+                        {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                      </Button></FormControl></PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={field.value} onSelect={(d) => { field.onChange(d); setIsPaymentDatePopoverOpen(false); }} initialFocus /></PopoverContent>
+                    </Popover><FormMessage />
+                  </FormItem>)} />
+                <FormField control={paymentForm.control} name="supplierName" render={({ field }) => (
+                  <FormItem><FormLabel>اسم المورد</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl>
+                      <SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>)} />
+                <FormField control={paymentForm.control} name="amount" render={({ field }) => (
+                  <FormItem><FormLabel>المبلغ المصروف</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={paymentForm.control} name="responsiblePerson" render={({ field }) => (
+                  <FormItem><FormLabel>القائم بالتحويل</FormLabel><FormControl><Input placeholder="اسم المسؤول" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              </div>
+              <FormField control={paymentForm.control} name="method" render={({ field }) => (
+                <FormItem className="space-y-3"><FormLabel>طريقة التحويل</FormLabel>
+                  <FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="نقدي" /></FormControl><FormLabel className="font-normal">نقدي</FormLabel></FormItem>
+                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="بنكي" /></FormControl><FormLabel className="font-normal">بنكي</FormLabel></FormItem>
+                  </RadioGroup></FormControl><FormMessage />
+                </FormItem>)} />
+              {paymentMethodWatcher === 'بنكي' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md">
+                  <FormField control={paymentForm.control} name="sourceBank" render={({ field }) => (
+                    <FormItem><FormLabel>البنك المحول منه</FormLabel><FormControl><Input placeholder="حساب الشركة" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={paymentForm.control} name="destinationBank" render={({ field }) => (
+                    <FormItem><FormLabel>البنك المحول إليه</FormLabel><FormControl><Input placeholder="بنك المورد" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                </div>
+              )}
+              <FormField control={paymentForm.control} name="reason" render={({ field }) => (
+                <FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للصرف..." {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={paymentForm.control} name="documentUrl" render={({ field }) => (
+                <FormItem><FormLabel>رابط مستند التحويل (اختياري)</FormLabel><FormControl><Input placeholder="https://example.com/receipt.pdf" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose><Button type="submit">تسجيل الدفعة</Button></DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Transfer Dialog */}
       <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>تحويل رصيد بين الموردين</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>تحويل رصيد بين الموردين</DialogTitle></DialogHeader>
           <Form {...transferForm}>
             <form onSubmit={transferForm.handleSubmit(onSubmitTransfer)} className="grid gap-4 py-4">
-              <FormField
-                control={transferForm.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>تاريخ التحويل</FormLabel>
+              <FormField control={transferForm.control} name="date" render={({ field }) => (
+                  <FormItem className="flex flex-col"><FormLabel>تاريخ التحويل</FormLabel>
                     <Popover modal={false} open={isTransferDatePopoverOpen} onOpenChange={setIsTransferDatePopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}
-                          >
-                            <CalendarIcon className="ml-2 h-4 w-4" />
-                            {field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="center">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={(date) => {
-                            field.onChange(date);
-                            setIsTransferDatePopoverOpen(false);
-                          }}
-                          disabled={(date) => date > new Date()}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={transferForm.control}
-                name="fromSupplier"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>المورد المحول منه</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={transferForm.control}
-                name="toSupplier"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>المورد المحول إليه</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={transferForm.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>المبلغ المحول</FormLabel>
-                    <FormControl><Input type="number" placeholder="0" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={transferForm.control}
-                name="method"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>طريقة التحويل</FormLabel>
-                    <FormControl><Input placeholder="مثال: تحويل بنكي" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={transferForm.control}
-                name="reason"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>السبب / البيان</FormLabel>
-                    <FormControl><Textarea placeholder="اكتب سببًا واضحًا للتحويل..." {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter className="pt-4">
-                 <DialogClose asChild>
-                  <Button type="button" variant="secondary">إلغاء</Button>
-                </DialogClose>
-                <Button type="submit">حفظ التحويل</Button>
-              </DialogFooter>
+                      <PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}>
+                        <CalendarIcon className="ml-2 h-4 w-4" />{field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                      </Button></FormControl></PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={field.value} onSelect={(d) => { field.onChange(d); setIsTransferDatePopoverOpen(false); }} initialFocus /></PopoverContent>
+                    </Popover><FormMessage />
+                  </FormItem>)} />
+              <FormField control={transferForm.control} name="fromSupplier" render={({ field }) => (
+                <FormItem><FormLabel>المورد المحول منه</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormField control={transferForm.control} name="toSupplier" render={({ field }) => (
+                <FormItem><FormLabel>المورد المحول إليه</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormField control={transferForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>المبلغ المحول</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={transferForm.control} name="method" render={({ field }) => (<FormItem><FormLabel>طريقة التحويل</FormLabel><FormControl><Input placeholder="مثال: تحويل بنكي" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={transferForm.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للتحويل..." {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose><Button type="submit">حفظ التحويل</Button></DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي عدد الموردين</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalSuppliers}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي رصيد الموردين لدى المصنع</CardTitle>
-            <Factory className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${totalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {totalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-            </div>
-             <p className="text-xs text-muted-foreground">على أساس (إجمالي المدفوع للمصنع - إجمالي المشتريات)</p>
-          </CardContent>
-        </Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">إجمالي عدد الموردين</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalSuppliers}</div></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">إجمالي رصيد الموردين لدى المصنع</CardTitle><Factory className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className={`text-2xl font-bold ${totalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{totalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div><p className="text-xs text-muted-foreground">على أساس (إجمالي المدفوع للمصنع - إجمالي المشتريات)</p></CardContent></Card>
       </div>
 
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>ملخص أرصدة الموردين</CardTitle>
-          <p className="text-sm text-muted-foreground pt-2">
-            يعرض هذا التقرير ملخصًا لأرصدة الموردين. اضغط على اسم المورد لعرض سجله الكامل.
-          </p>
+          <p className="text-sm text-muted-foreground pt-2">يعرض هذا التقرير ملخصًا لأرصدة الموردين. اضغط على اسم المورد لعرض سجله الكامل.</p>
         </CardHeader>
         <CardContent>
           <div className="relative w-full overflow-auto">
             <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>اسم المورد</TableHead>
-                  <TableHead>مبلغ المشتريات</TableHead>
-                  <TableHead>إجمالي المبيعات</TableHead>
-                  <TableHead>المستلم (بعد التحويلات)</TableHead>
-                  <TableHead>الكمية المشتراة (طن)</TableHead>
-                  <TableHead>الكمية المتبقية (طن)</TableHead>
-                  <TableHead>قيمة الكمية المتبقية</TableHead>
-                  <TableHead>رصيد المبيعات</TableHead>
-                  <TableHead>الرصيد النقدي</TableHead>
-                  <TableHead>رصيد لدى المصنع</TableHead>
-                  <TableHead>عدد العمليات</TableHead>
-                  <TableHead>إجراءات</TableHead>
-                </TableRow>
-              </TableHeader>
+              <TableHeader><TableRow>
+                <TableHead>اسم المورد</TableHead><TableHead>مبلغ المشتريات</TableHead><TableHead>إجمالي المبيعات</TableHead><TableHead>المستلم (بعد التحويلات والدفعات)</TableHead><TableHead>الكمية المشتراة (طن)</TableHead><TableHead>الكمية المتبقية (طن)</TableHead><TableHead>قيمة الكمية المتبقية</TableHead><TableHead>رصيد المبيعات</TableHead><TableHead>الرصيد النقدي</TableHead><TableHead>رصيد لدى المصنع</TableHead><TableHead>عدد العمليات</TableHead><TableHead>إجراءات</TableHead>
+              </TableRow></TableHeader>
               <TableBody>
                 {supplierSummaries.length > 0 ? (
                   supplierSummaries.map(item => (
                     <TableRow key={item.supplierName}>
-                      <TableCell className="font-medium">
-                         <Link href={`/supplier/${encodeURIComponent(item.supplierName)}`} className="text-primary hover:underline">
-                           {item.supplierName}
-                         </Link>
-                      </TableCell>
-                       <TableCell>
-                        {item.totalPurchases.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                      </TableCell>
-                      <TableCell>
-                        {item.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                      </TableCell>
-                       <TableCell className="text-success">
-                        {item.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                      </TableCell>
-                      <TableCell>
-                        {item.totalQuantityPurchased.toLocaleString('ar-EG')}
-                      </TableCell>
-                       <TableCell>
-                        {item.remainingQuantity.toLocaleString('ar-EG')}
-                      </TableCell>
-                      <TableCell>
-                        {item.remainingStockValue.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                      </TableCell>
-                      <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {item.finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                      </TableCell>
-                       <TableCell className={`font-bold ${item.finalCashFlowBalance >= 0 ? 'text-destructive' : 'text-success'}`}>
-                        {item.finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                      </TableCell>
-                      <TableCell className={`font-bold ${item.finalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {item.finalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
-                      </TableCell>
-                      <TableCell>
-                        {item.transactionCount}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button asChild variant="ghost" size="icon">
-                            <Link href={`/sales-balance-report/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`التقرير المبسط لـ ${item.supplierName}`}>
-                              <FileText className="h-4 w-4" />
-                              <span className="sr-only">التقرير المبسط لـ {item.supplierName}</span>
-                            </Link>
-                          </Button>
-                          <Button asChild variant="ghost" size="icon">
-                            <Link href={`/share/supplier/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`مشاركة تقرير ${item.supplierName}`}>
-                              <Share2 className="h-4 w-4" />
-                              <span className="sr-only">مشاركة تقرير {item.supplierName}</span>
-                            </Link>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title={`حذف المورد ${item.supplierName}`}>
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">حذف المورد {item.supplierName}</span>
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف المورد بشكل دائم
-                                  ({item.supplierName}) وجميع سجلات عملياته.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteSupplier(item.supplierName)}>متابعة</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
+                      <TableCell className="font-medium"><Link href={`/supplier/${encodeURIComponent(item.supplierName)}`} className="text-primary hover:underline">{item.supplierName}</Link></TableCell>
+                      <TableCell>{item.totalPurchases.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell>{item.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell className="text-success">{item.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell>{item.totalQuantityPurchased.toLocaleString('ar-EG')}</TableCell>
+                      <TableCell>{item.remainingQuantity.toLocaleString('ar-EG')}</TableCell>
+                      <TableCell>{item.remainingStockValue.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{item.finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell className={`font-bold ${item.finalCashFlowBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{item.finalCashFlowBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell className={`font-bold ${item.finalFactoryBalance >= 0 ? 'text-success' : 'text-destructive'}`}>{item.finalFactoryBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell>{item.transactionCount}</TableCell>
+                      <TableCell><div className="flex items-center gap-1">
+                        <Button asChild variant="ghost" size="icon"><Link href={`/sales-balance-report/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`التقرير المبسط لـ ${item.supplierName}`}><FileText className="h-4 w-4" /><span className="sr-only">التقرير المبسط لـ {item.supplierName}</span></Link></Button>
+                        <Button asChild variant="ghost" size="icon"><Link href={`/share/supplier/${encodeURIComponent(item.supplierName)}`} target="_blank" rel="noopener noreferrer" title={`مشاركة تقرير ${item.supplierName}`}><Share2 className="h-4 w-4" /><span className="sr-only">مشاركة تقرير {item.supplierName}</span></Link></Button>
+                        <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title={`حذف المورد ${item.supplierName}`}><Trash2 className="h-4 w-4" /><span className="sr-only">حذف المورد {item.supplierName}</span></Button></AlertDialogTrigger>
+                          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle><AlertDialogDescription>هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف المورد بشكل دائم ({item.supplierName}) وجميع سجلات عملياته.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={() => deleteSupplier(item.supplierName)}>متابعة</AlertDialogAction></AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div></TableCell>
                     </TableRow>
                   ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={12} className="h-24 text-center">
-                      لا يوجد موردين لعرضهم. قم بإضافة عمليات أولاً.
-                    </TableCell>
-                  </TableRow>
-                )}
+                ) : (<TableRow><TableCell colSpan={12} className="h-24 text-center">لا يوجد موردين لعرضهم. قم بإضافة عمليات أولاً.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
-      
-      {sortedTransfers.length > 0 && (
-         <Card>
-          <CardHeader>
-            <CardTitle>سجل تحويلات الأرصدة</CardTitle>
-          </CardHeader>
+
+      {sortedPayments.length > 0 && (
+         <Card className="mb-8">
+          <CardHeader><CardTitle>سجل الدفعات للموردين</CardTitle></CardHeader>
           <CardContent>
             <div className="relative w-full overflow-auto">
               <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>التاريخ</TableHead>
-                    <TableHead>المحول منه</TableHead>
-                    <TableHead>المحول إليه</TableHead>
-                    <TableHead>المبلغ</TableHead>
-                    <TableHead>السبب</TableHead>
-                    <TableHead>الطريقة</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow>
+                  <TableHead>التاريخ</TableHead><TableHead>المورد</TableHead><TableHead>المبلغ</TableHead><TableHead>الطريقة</TableHead><TableHead>السبب</TableHead><TableHead>المسؤول</TableHead><TableHead>إجراء</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {sortedPayments.map(p => (
+                    <TableRow key={p.id}>
+                      <TableCell>{format(p.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
+                      <TableCell className="font-medium">{p.supplierName}</TableCell>
+                      <TableCell className="font-bold text-destructive">{p.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell>{p.method}</TableCell>
+                      <TableCell>{p.reason}</TableCell>
+                      <TableCell>{p.responsiblePerson}</TableCell>
+                      <TableCell>
+                        <AlertDialog><AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title="حذف الدفعة"><Trash2 className="h-4 w-4" /></Button>
+                        </AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف هذه الدفعة بشكل دائم.</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={() => deleteSupplierPayment(p.id)}>متابعة</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent></AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {sortedTransfers.length > 0 && (
+         <Card>
+          <CardHeader><CardTitle>سجل تحويلات الأرصدة</CardTitle></CardHeader>
+          <CardContent>
+            <div className="relative w-full overflow-auto">
+              <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
+                <TableHeader><TableRow>
+                  <TableHead>التاريخ</TableHead><TableHead>المحول منه</TableHead><TableHead>المحول إليه</TableHead><TableHead>المبلغ</TableHead><TableHead>السبب</TableHead><TableHead>الطريقة</TableHead>
+                </TableRow></TableHeader>
                 <TableBody>
                   {sortedTransfers.map(t => (
                     <TableRow key={t.id}>

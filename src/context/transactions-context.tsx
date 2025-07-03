@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { type Transaction, type Expense, type BalanceTransfer } from '@/types';
+import { type Transaction, type Expense, type BalanceTransfer, type SupplierPayment } from '@/types';
 import { db } from '@/lib/firebase';
 import { 
   collection, 
@@ -31,6 +31,9 @@ interface TransactionsContextType {
   addBalanceTransfer: (transfer: Omit<BalanceTransfer, 'id'>) => Promise<void>;
   updateBalanceTransfer: (updatedTransfer: BalanceTransfer) => Promise<void>;
   deleteBalanceTransfer: (transferId: string) => Promise<void>;
+  supplierPayments: SupplierPayment[];
+  addSupplierPayment: (payment: Omit<SupplierPayment, 'id'>) => Promise<void>;
+  deleteSupplierPayment: (paymentId: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -41,6 +44,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balanceTransfers, setBalanceTransfers] = useState<BalanceTransfer[]>([]);
+  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -50,6 +54,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         setTransactions([]);
         setExpenses([]);
         setBalanceTransfers([]);
+        setSupplierPayments([]);
         setLoading(false);
         return;
       }
@@ -58,6 +63,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         const transactionsCollectionRef = collection(db, 'users', currentUser.uid, 'transactions');
         const expensesCollectionRef = collection(db, 'users', currentUser.uid, 'expenses');
         const balanceTransfersCollectionRef = collection(db, 'users', currentUser.uid, 'balanceTransfers');
+        const supplierPaymentsCollectionRef = collection(db, 'users', currentUser.uid, 'supplierPayments');
         
         // Fetch transactions
         const transactionSnapshot = await getDocs(transactionsCollectionRef);
@@ -96,6 +102,19 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
           } as BalanceTransfer;
         });
         setBalanceTransfers(fetchedTransfers.sort((a, b) => b.date.getTime() - a.date.getTime()));
+
+        // Fetch supplier payments
+        const paymentSnapshot = await getDocs(supplierPaymentsCollectionRef);
+        const fetchedPayments = paymentSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            ...data,
+            id: doc.id,
+            date: new Date(data.date),
+          } as SupplierPayment;
+        });
+        setSupplierPayments(fetchedPayments.sort((a, b) => b.date.getTime() - a.date.getTime()));
+
 
       } catch (error) {
         console.error("Could not fetch data from Firestore", error);
@@ -298,11 +317,43 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id'>) => {
+    if (!currentUser) return;
+    try {
+      const paymentsCollectionRef = collection(db, 'users', currentUser.uid, 'supplierPayments');
+      const docData = {
+        ...payment,
+        date: payment.date.toISOString(),
+      };
+      const docRef = await addDoc(paymentsCollectionRef, docData);
+      setSupplierPayments(prev => [{...payment, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
+      toast({ title: "نجاح", description: "تم تسجيل الدفعة بنجاح." });
+    } catch (error) {
+      console.error("Error adding supplier payment: ", error);
+      toast({ title: "خطأ", description: "لم نتمكن من تسجيل الدفعة.", variant: "destructive" });
+    }
+  };
+  
+  const deleteSupplierPayment = async (paymentId: string) => {
+    if (!currentUser) return;
+    try {
+      const paymentDoc = doc(db, 'users', currentUser.uid, 'supplierPayments', paymentId);
+      await deleteDoc(paymentDoc);
+      setSupplierPayments(prev => prev.filter(p => p.id !== paymentId));
+      toast({ title: "تم الحذف", description: "تم حذف الدفعة بنجاح." });
+    } catch (error) {
+      console.error("Error deleting supplier payment: ", error);
+      toast({ title: "خطأ", description: "لم نتمكن من حذف الدفعة.", variant: "destructive" });
+    }
+  };
+
+
   return (
     <TransactionsContext.Provider value={{ 
       transactions, addTransaction, updateTransaction, deleteTransaction, deleteSupplier, 
       expenses, addExpense, updateExpense, deleteExpense,
       balanceTransfers, addBalanceTransfer, updateBalanceTransfer, deleteBalanceTransfer,
+      supplierPayments, addSupplierPayment, deleteSupplierPayment,
       loading 
     }}>
       {children}

@@ -38,3 +38,16 @@ export type BalanceTransfer = {
   reason: string;
   method: string;
 };
+
+export type SupplierPayment = {
+  id: string;
+  date: Date;
+  amount: number;
+  supplierName: string;
+  method: 'نقدي' | 'بنكي';
+  sourceBank?: string;
+  destinationBank?: string;
+  reason: string;
+  responsiblePerson: string;
+  documentUrl?: string;
+};
