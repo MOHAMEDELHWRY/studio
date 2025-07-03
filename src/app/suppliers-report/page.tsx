@@ -29,6 +29,7 @@ interface SupplierSummary {
   totalReceivedFromSupplier: number;
   totalQuantityPurchased: number;
   remainingQuantity: number;
+  remainingStockValue: number;
   finalSalesBalance: number;
   finalCashFlowBalance: number;
   finalFactoryBalance: number;
@@ -59,6 +60,7 @@ export default function SuppliersReportPage() {
       let totalReceivedFromSupplier = 0;
       let totalQuantityPurchased = 0;
       let totalQuantitySold = 0;
+      let remainingStockValue = 0;
 
 
       supplierTransactions.forEach(t => {
@@ -69,10 +71,12 @@ export default function SuppliersReportPage() {
         totalQuantityPurchased += t.quantity;
         if (t.totalSellingPrice > 0) {
             totalQuantitySold += t.quantity;
+        } else {
+            remainingStockValue += t.totalPurchasePrice;
         }
       });
 
-      const finalSalesBalance = totalSales - totalReceivedFromSupplier;
+      const finalSalesBalance = totalReceivedFromSupplier - totalSales;
       const finalCashFlowBalance = totalPaidToFactory - totalSales;
       const finalFactoryBalance = totalPaidToFactory - totalPurchases;
       const remainingQuantity = totalQuantityPurchased - totalQuantitySold;
@@ -84,6 +88,7 @@ export default function SuppliersReportPage() {
         totalReceivedFromSupplier,
         totalQuantityPurchased,
         remainingQuantity,
+        remainingStockValue,
         finalSalesBalance,
         finalCashFlowBalance,
         finalFactoryBalance,
@@ -154,6 +159,7 @@ export default function SuppliersReportPage() {
                   <TableHead>المستلم من المورد</TableHead>
                   <TableHead>الكمية المشتراة (طن)</TableHead>
                   <TableHead>الكمية المتبقية (طن)</TableHead>
+                  <TableHead>قيمة الكمية المتبقية</TableHead>
                   <TableHead>رصيد المبيعات</TableHead>
                   <TableHead>الرصيد النقدي</TableHead>
                   <TableHead>رصيد لدى المصنع</TableHead>
@@ -184,6 +190,9 @@ export default function SuppliersReportPage() {
                       </TableCell>
                        <TableCell>
                         {item.remainingQuantity.toLocaleString('ar-EG')}
+                      </TableCell>
+                      <TableCell>
+                        {item.remainingStockValue.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
                       </TableCell>
                       <TableCell className={`font-bold ${item.finalSalesBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
                         {item.finalSalesBalance.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
@@ -238,7 +247,7 @@ export default function SuppliersReportPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={11} className="h-24 text-center">
+                    <TableCell colSpan={12} className="h-24 text-center">
                       لا يوجد موردين لعرضهم. قم بإضافة عمليات أولاً.
                     </TableCell>
                   </TableRow>
