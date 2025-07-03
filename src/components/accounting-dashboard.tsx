@@ -599,9 +599,24 @@ export default function AccountingDashboard() {
               <CardHeader>
                   <CardTitle>سجل العمليات</CardTitle>
                   <div className="flex flex-col md:flex-row gap-2 mt-4">
-                      <div className="relative flex-1"> <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /> <Input placeholder="بحث بالوصف أو اسم المورد..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /> </div>
-                      <Popover open={isFilterDatePopoverOpen} onOpenChange={setIsFilterDatePopoverOpen}> <PopoverTrigger asChild> <Button variant={"outline"} className={cn("w-full md:w-[240px] justify-start text-right font-normal", !dateFilter && "text-muted-foreground")}> <CalendarIcon className="ml-2 h-4 w-4" /> {dateFilter ? format(dateFilter, "PPP", { locale: ar }) : <span>فلترة بالتاريخ</span>} </Button> </PopoverTrigger> <PopoverContent className="w-auto p-0" align="center"> <Calendar mode="single" selected={dateFilter} onSelect={(date) => { setDateFilter(date); setIsFilterDatePopoverOpen(false); }} initialFocus /> </PopoverContent> </Popover>
-                       {dateFilter && <Button variant="ghost" onClick={() => setDateFilter(undefined)}>مسح الفلتر</Button>}
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="بحث بالوصف أو اسم المورد..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Popover open={isFilterDatePopoverOpen} onOpenChange={setIsFilterDatePopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant={"outline"} className={cn("w-full md:w-[240px] justify-start text-right font-normal", !dateFilter && "text-muted-foreground")}>
+                              <CalendarIcon className="ml-2 h-4 w-4" />
+                              {dateFilter ? format(dateFilter, "PPP", { locale: ar }) : <span>فلترة بالتاريخ</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="center">
+                            <Calendar mode="single" selected={dateFilter} onSelect={(date) => { setDateFilter(date); setIsFilterDatePopoverOpen(false); }} initialFocus />
+                          </PopoverContent>
+                        </Popover>
+                        {dateFilter && <Button variant="ghost" onClick={() => setDateFilter(undefined)}>مسح الفلتر</Button>}
+                      </div>
                   </div>
               </CardHeader>
               <CardContent>
