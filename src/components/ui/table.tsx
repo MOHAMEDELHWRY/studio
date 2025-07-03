@@ -12,7 +12,9 @@ const Table = React.forwardRef<
       className={cn("w-full caption-bottom text-sm", className)}
       {...props}
     >
-      {children}
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child) ? child : null
+      )}
     </table>
   </div>
 ))
@@ -23,7 +25,9 @@ const TableHeader = React.forwardRef<
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, children, ...props }, ref) => (
   <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props}>
-    {children}
+    {React.Children.map(children, (child) =>
+      React.isValidElement(child) ? child : null
+    )}
   </thead>
 ))
 TableHeader.displayName = "TableHeader"
@@ -37,7 +41,9 @@ const TableBody = React.forwardRef<
     className={cn("[&_tr:last-child]:border-0", className)}
     {...props}
   >
-    {children}
+    {React.Children.map(children, (child) =>
+      React.isValidElement(child) ? child : null
+    )}
   </tbody>
 ))
 TableBody.displayName = "TableBody"
@@ -54,7 +60,9 @@ const TableFooter = React.forwardRef<
     )}
     {...props}
   >
-    {children}
+    {React.Children.map(children, (child) =>
+      React.isValidElement(child) ? child : null
+    )}
   </tfoot>
 ))
 TableFooter.displayName = "TableFooter"
@@ -71,7 +79,9 @@ const TableRow = React.forwardRef<
     )}
     {...props}
   >
-    {children}
+    {React.Children.map(children, (child) =>
+      React.isValidElement(child) ? child : null
+    )}
   </tr>
 ))
 TableRow.displayName = "TableRow"
