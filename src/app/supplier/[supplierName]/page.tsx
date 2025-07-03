@@ -66,7 +66,6 @@ export default function SupplierReportPage() {
       totalReceivedFromSupplier: 0,
       totalTonsPurchased: 0,
       totalTonsSold: 0,
-      costOfGoodsSold: 0,
     };
 
     const breakdown: {
@@ -78,6 +77,7 @@ export default function SupplierReportPage() {
     };
 
     let totalTaxesOnSoldItems = 0;
+    let remainingStockValue = 0;
 
     supplierTransactionsAsc.forEach(t => {
       // Aggregate main stats
@@ -91,7 +91,8 @@ export default function SupplierReportPage() {
       if (isSold) {
         stats.totalTonsSold += t.quantity;
         totalTaxesOnSoldItems += t.taxes;
-        stats.costOfGoodsSold += t.totalPurchasePrice;
+      } else {
+        remainingStockValue += t.totalPurchasePrice;
       }
 
       // Category breakdown
@@ -117,11 +118,13 @@ export default function SupplierReportPage() {
       }
     });
 
+    const costOfGoodsSold = stats.totalPurchases - remainingStockValue;
+
     const supplierExpensesTotal = expenses
       .filter(e => e.supplierName === supplierName)
       .reduce((sum, e) => sum + e.amount, 0);
 
-    stats.totalProfit = stats.totalSales - stats.costOfGoodsSold - totalTaxesOnSoldItems - supplierExpensesTotal;
+    stats.totalProfit = stats.totalSales - costOfGoodsSold - totalTaxesOnSoldItems - supplierExpensesTotal;
     
     const supplierExpensesList = expenses
       .filter(e => e.supplierName === supplierName)

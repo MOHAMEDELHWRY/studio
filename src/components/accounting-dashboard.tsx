@@ -241,7 +241,7 @@ export default function AccountingDashboard() {
   const onSubmit = async (values: TransactionFormValues) => {
     try {
         const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
-        const totalSellingPrice = (values.quantity || 0) * (values.sellingPrice || 0);
+        const totalSellingPrice = (values.sellingPrice || 0) * (values.sellingPrice || 0);
         
         const profit =
             (values.sellingPrice || 0) > 0
@@ -338,22 +338,24 @@ export default function AccountingDashboard() {
 
         const isSold = t.totalSellingPrice > 0;
         if (isSold) {
-          acc.costOfGoodsSold += t.totalPurchasePrice;
           acc.totalTaxesOnSoldItems += t.taxes;
+        } else {
+          acc.remainingStockValue += t.totalPurchasePrice;
         }
         return acc;
       },
       {
         totalSales: 0,
         totalPurchases: 0,
-        costOfGoodsSold: 0,
+        remainingStockValue: 0,
         totalReceivedFromSuppliers: 0,
         totalPaidToFactory: 0,
         totalTaxesOnSoldItems: 0,
       }
     );
 
-    const profitBeforeExpenses = aggregates.totalSales - aggregates.costOfGoodsSold - aggregates.totalTaxesOnSoldItems;
+    const costOfGoodsSold = aggregates.totalPurchases - aggregates.remainingStockValue;
+    const profitBeforeExpenses = aggregates.totalSales - costOfGoodsSold - aggregates.totalTaxesOnSoldItems;
 
     return {
       totalSales: aggregates.totalSales,
