@@ -49,7 +49,7 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameT
 };
 
 export default function ReportsPage() {
-  const { transactions } = useTransactions();
+  const { transactions, expenses } = useTransactions();
 
   const [selectedGovernorate, setSelectedGovernorate] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -70,44 +70,60 @@ export default function ReportsPage() {
     });
   }, [transactions, selectedGovernorate, dateRange]);
 
+  const filteredExpenses = useMemo(() => {
+    const toDate = dateRange?.to ? new Date(dateRange.to) : undefined;
+    if (toDate) {
+      toDate.setHours(23, 59, 59, 999);
+    }
+    return expenses.filter(e => {
+        const dateMatch =
+        !dateRange?.from ||
+        (e.date >= dateRange.from && (!toDate || e.date <= toDate));
+        return dateMatch;
+    });
+  }, [expenses, dateRange]);
+
+
   const { chartData, tableData, groupingKeyHeader } = useMemo(() => {
-    const dataMap = new Map<string, { name: string, totalSales: number, totalProfit: number, count: number, profitPercentage: number }>();
+    const dataMap = new Map<string, {
+        name: string, 
+        totalSales: number, 
+        totalPurchases: number,
+        remainingStockValue: number,
+        totalTaxesOnSoldItems: number,
+        count: number 
+    }>();
     let header = 'المجموعة';
 
-    if (groupBy === 'month') {
-        header = 'الشهر';
-        filteredTransactions.forEach(t => {
-            const groupKey = format(t.date, 'yyyy-MM');
-            const displayName = format(new Date(groupKey + '-02'), 'MMMM yyyy', { locale: ar });
+    filteredTransactions.forEach(t => {
+        let groupKey: string, displayName: string;
 
-            if (!dataMap.has(groupKey)) {
-                dataMap.set(groupKey, { name: displayName, totalSales: 0, totalProfit: 0, count: 0, profitPercentage: 0 });
-            }
-            const current = dataMap.get(groupKey)!;
-            current.totalSales += t.totalSellingPrice;
-            current.totalProfit += t.profit;
-            current.count += 1;
-        });
-    } else { // groupBy === 'location'
-        const isGovSelected = selectedGovernorate !== 'all';
-        header = isGovSelected ? 'المركز' : 'المحافظة';
+        if (groupBy === 'month') {
+            header = 'الشهر';
+            groupKey = format(t.date, 'yyyy-MM');
+            displayName = format(new Date(groupKey + '-02'), 'MMMM yyyy', { locale: ar });
+        } else { // groupBy === 'location'
+            const isGovSelected = selectedGovernorate !== 'all';
+            header = isGovSelected ? 'المركز' : 'المحافظة';
+            groupKey = isGovSelected ? (t.city || `(${t.governorate} - غير محدد)`) : t.governorate;
+            displayName = groupKey;
+        }
         
-        filteredTransactions.forEach(t => {
-            let groupName: string = isGovSelected ? (t.city || `(${t.governorate} - غير محدد)`) : t.governorate;
-            
-            if (!dataMap.has(groupName)) {
-                dataMap.set(groupName, { name: groupName, totalSales: 0, totalProfit: 0, count: 0, profitPercentage: 0 });
-            }
-            const current = dataMap.get(groupName)!;
-            current.totalSales += t.totalSellingPrice;
-            current.totalProfit += t.profit;
-            current.count += 1;
-        });
-    }
+        if (!dataMap.has(groupKey)) {
+            dataMap.set(groupKey, { name: displayName, totalSales: 0, totalPurchases: 0, remainingStockValue: 0, totalTaxesOnSoldItems: 0, count: 0 });
+        }
+        
+        const current = dataMap.get(groupKey)!;
+        current.totalSales += t.totalSellingPrice;
+        current.totalPurchases += t.totalPurchasePrice;
+        current.count += 1;
 
-    for (const value of dataMap.values()) {
-        value.profitPercentage = value.totalSales > 0 ? (value.totalProfit / value.totalSales) * 100 : 0;
-    }
+        if (t.totalSellingPrice > 0) {
+            current.totalTaxesOnSoldItems += t.taxes;
+        } else {
+            current.remainingStockValue += t.totalPurchasePrice;
+        }
+    });
     
     const sortedEntries = Array.from(dataMap.entries()).sort((a, b) => {
         if (groupBy === 'month') {
@@ -116,18 +132,42 @@ export default function ReportsPage() {
         return b[1].totalSales - a[1].totalSales; // Sort by sales for location
     });
 
-    const finalData = sortedEntries.map(entry => entry[1]);
+    const finalData = sortedEntries.map(entry => {
+        const value = entry[1];
+        const costOfGoodsSold = value.totalPurchases - value.remainingStockValue;
+        const totalProfit = value.totalSales - costOfGoodsSold - value.totalTaxesOnSoldItems;
+        const profitPercentage = value.totalSales > 0 ? (totalProfit / value.totalSales) * 100 : 0;
+        
+        return {
+            name: value.name,
+            totalSales: value.totalSales,
+            count: value.count,
+            totalProfit,
+            profitPercentage,
+        };
+    });
     
     return { chartData: finalData, tableData: finalData, groupingKeyHeader: header };
   }, [filteredTransactions, selectedGovernorate, groupBy]);
 
   const totalReportStats = useMemo(() => {
-    return filteredTransactions.reduce((acc, t) => {
+    const stats = filteredTransactions.reduce((acc, t) => {
       acc.totalSales += t.totalSellingPrice;
-      acc.totalProfit += t.profit;
+      acc.totalPurchases += t.totalPurchasePrice;
+      if (t.totalSellingPrice > 0) {
+        acc.totalTaxesOnSoldItems += t.taxes;
+      } else {
+        acc.remainingStockValue += t.totalPurchasePrice;
+      }
       return acc;
-    }, { totalSales: 0, totalProfit: 0 });
-  }, [filteredTransactions]);
+    }, { totalSales: 0, totalPurchases: 0, remainingStockValue: 0, totalTaxesOnSoldItems: 0 });
+
+    const totalFilteredExpenses = filteredExpenses.reduce((acc, e) => acc + e.amount, 0);
+    const costOfGoodsSold = stats.totalPurchases - stats.remainingStockValue;
+    const totalProfit = stats.totalSales - costOfGoodsSold - stats.totalTaxesOnSoldItems - totalFilteredExpenses;
+
+    return { totalSales: stats.totalSales, totalProfit };
+  }, [filteredTransactions, filteredExpenses]);
   
   const reportTitle = useMemo(() => {
     let titleParts = [];
