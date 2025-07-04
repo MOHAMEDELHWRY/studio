@@ -15,13 +15,10 @@ import {
   Calendar as CalendarIcon,
   ShoppingCart,
   Factory,
-  Landmark,
   MinusCircle,
   Wallet,
   Trash2,
   Wand2,
-  ArrowRightLeft,
-  File as FileIcon
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { format } from 'date-fns';
@@ -29,7 +26,7 @@ import { ar } from 'date-fns/locale';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-import { type Transaction, type Expense, type BalanceTransfer, type SupplierPayment } from '@/types';
+import { type Transaction, type Expense } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import {
@@ -73,8 +70,6 @@ import { Skeleton } from './ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { analyzePerformance, type PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
 import { descriptionOptions, categoryOptions, varietyOptions } from '@/data/transaction-data';
-import { Textarea } from './ui/textarea';
-import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
@@ -105,38 +100,11 @@ const expenseSchema = z.object({
 });
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
-const transferSchema = z.object({
-  date: z.date({ required_error: "التاريخ مطلوب." }),
-  amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
-  fromSupplier: z.string().min(1, "يجب اختيار المورد المحول منه."),
-  toSupplier: z.string().min(1, "يجب اختيار المورد المحول إليه."),
-  reason: z.string().trim().min(1, "يجب كتابة سبب التحويل."),
-  method: z.string().trim().min(1, "يجب تحديد طريقة التحويل."),
-}).refine(data => data.fromSupplier !== data.toSupplier, {
-  message: "لا يمكن التحويل إلى نفس المورد.",
-  path: ["toSupplier"],
-});
-type TransferFormValues = z.infer<typeof transferSchema>;
-
-const paymentSchema = z.object({
-  date: z.date({ required_error: "التاريخ مطلوب." }),
-  amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
-  supplierName: z.string().min(1, "يجب اختيار المورد."),
-  method: z.enum(['نقدي', 'بنكي'], { required_error: "طريقة التحويل مطلوبة." }),
-  sourceBank: z.string().optional(),
-  destinationBank: z.string().optional(),
-  reason: z.string().trim().min(1, "يجب كتابة سبب الصرف."),
-  responsiblePerson: z.string().trim().min(1, "يجب تحديد القائم بالتحويل."),
-  document: z.instanceof(FileList).optional(),
-});
-type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 export default function AccountingDashboard() {
   const { 
     transactions, addTransaction, updateTransaction, deleteTransaction, 
     expenses, addExpense, updateExpense, deleteExpense, 
-    balanceTransfers, addBalanceTransfer,
-    supplierPayments, addSupplierPayment, updateSupplierPayment, deleteSupplierPayment,
     loading 
   } = useTransactions();
   const { toast } = useToast();
@@ -151,18 +119,13 @@ export default function AccountingDashboard() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [editingPayment, setEditingPayment] = useState<SupplierPayment | null>(null);
-
+  
   // Popover states
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
   const [isExecDatePopoverOpen, setIsExecDatePopoverOpen] = useState(false);
   const [isDueDatePopoverOpen, setIsDueDatePopoverOpen] = useState(false);
   const [isExpenseDatePopoverOpen, setIsExpenseDatePopoverOpen] = useState(false);
   const [isFilterDatePopoverOpen, setIsFilterDatePopoverOpen] = useState(false);
-  const [isTransferDatePopoverOpen, setIsTransferDatePopoverOpen] = useState(false);
-  const [isPaymentDatePopoverOpen, setIsPaymentDatePopoverOpen] = useState(false);
   
   const [availableCities, setAvailableCities] = useState<string[]>([]);
 
@@ -185,21 +148,6 @@ export default function AccountingDashboard() {
     defaultValues: { date: new Date(), description: "", amount: 0, paymentOrder: "", supplierName: "" },
   });
 
-  // Transfer Form
-  const transferForm = useForm<TransferFormValues>({
-    resolver: zodResolver(transferSchema),
-    defaultValues: { date: new Date(), amount: 0, fromSupplier: "", toSupplier: "", reason: "", method: "تحويل بنكي" },
-  });
-  
-  // Payment Form
-  const paymentForm = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentSchema),
-    defaultValues: { date: new Date(), amount: 0, supplierName: "", method: 'نقدي', reason: "", responsiblePerson: "" },
-  });
-  const paymentMethodWatcher = paymentForm.watch('method');
-  const paymentDocumentWatcher = paymentForm.watch('document');
-
-
   useEffect(() => {
       if (selectedGovernorate) {
           setAvailableCities(cities[selectedGovernorate] || []);
@@ -213,7 +161,12 @@ export default function AccountingDashboard() {
   const handleOpenDialog = (transaction: Transaction | null) => {
     setEditingTransaction(transaction);
     if (transaction) {
-      form.reset({ ...transaction, date: new Date(transaction.date), executionDate: transaction.executionDate ? new Date(transaction.executionDate) : undefined, dueDate: transaction.dueDate ? new Date(transaction.dueDate) : undefined });
+      form.reset({
+        ...transaction,
+        date: new Date(transaction.date),
+        executionDate: transaction.executionDate ? new Date(transaction.executionDate) : undefined,
+        dueDate: transaction.dueDate ? new Date(transaction.dueDate) : undefined,
+      });
        if (transaction.governorate) setAvailableCities(cities[transaction.governorate] || []);
     } else {
       form.reset({ date: new Date(), executionDate: undefined, dueDate: undefined, supplierName: "", governorate: "", city: "", description: "اسمنت العريش", category: "", variety: "", quantity: 0, purchasePrice: 0, sellingPrice: 0, taxes: 0, amountPaidToFactory: 0, amountReceivedFromSupplier: 0 });
@@ -229,16 +182,6 @@ export default function AccountingDashboard() {
       expenseForm.reset({ date: new Date(), description: "", amount: 0, paymentOrder: "", supplierName: "" });
     }
     setIsExpenseDialogOpen(true);
-  };
-  
-  const handleOpenPaymentDialog = (payment: SupplierPayment | null) => {
-    setEditingPayment(payment);
-    if (payment) {
-      paymentForm.reset({ ...payment, date: new Date(payment.date) });
-    } else {
-      paymentForm.reset({ date: new Date(), amount: 0, supplierName: "", method: 'نقدي', reason: "", responsiblePerson: "" });
-    }
-    setIsPaymentDialogOpen(true);
   };
   
   const onExpenseDialogOpenChange = (open: boolean) => {
@@ -289,35 +232,9 @@ export default function AccountingDashboard() {
     expenseForm.reset();
     setIsExpenseDialogOpen(false);
   };
-
-  const onSubmitTransfer = async (values: TransferFormValues) => {
-    await addBalanceTransfer(values);
-    transferForm.reset();
-    setIsTransferDialogOpen(false);
-    toast({ title: "نجاح", description: "تم تسجيل التحويل بنجاح." });
-  };
-  
-  const onSubmitPayment = async (values: PaymentFormValues) => {
-    const documentFile = values.document?.[0];
-    const { document, ...restOfValues } = values;
-
-    if (editingPayment) {
-        const updatedPaymentData: SupplierPayment = { ...editingPayment, ...restOfValues, documentUrl: editingPayment.documentUrl };
-        await updateSupplierPayment(updatedPaymentData, documentFile);
-    } else {
-      const newPaymentData: Omit<SupplierPayment, 'id'> = { ...restOfValues, documentUrl: '' };
-      await addSupplierPayment(newPaymentData, documentFile);
-    }
-
-    paymentForm.reset();
-    setIsPaymentDialogOpen(false);
-    setEditingPayment(null);
-  };
   
   const handleDeleteTransaction = async (transactionId: string) => await deleteTransaction(transactionId);
   const handleDeleteExpense = async (expenseId: string) => await deleteExpense(expenseId);
-  const handleDeletePayment = async (paymentId: string) => await deleteSupplierPayment(paymentId);
-
 
   const filteredAndSortedTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -371,7 +288,6 @@ export default function AccountingDashboard() {
   const totalExpenses = useMemo(() => expenses.reduce((acc, e) => acc + e.amount, 0), [expenses]);
   const totalProfit = profitFromTransactions - totalExpenses;
 
-
   const chartData = useMemo(() => {
     const monthlyData: { [key: string]: { profit: number } } = {};
     filteredAndSortedTransactions.forEach(t => {
@@ -381,11 +297,7 @@ export default function AccountingDashboard() {
     });
     return Object.entries(monthlyData).map(([name, values]) => ({ name, ...values })).reverse();
   }, [filteredAndSortedTransactions]);
-
-  const sortedPayments = useMemo(() => [...supplierPayments].sort((a,b) => b.date.getTime() - a.date.getTime()), [supplierPayments]);
-  const sortedTransfers = useMemo(() => [...balanceTransfers].sort((a,b) => b.date.getTime() - a.date.getTime()), [balanceTransfers]);
-
-
+  
   const handleExport = () => {
     const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "الصنف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد"];
     const escapeCSV = (str: any) => {
@@ -466,13 +378,14 @@ export default function AccountingDashboard() {
   return (
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex items-center justify-between mb-8 gap-4 flex-wrap">
-        <div className="flex items-center gap-2"> <SidebarTrigger /> <h1 className="text-3xl font-bold text-primary"> لوحة التحكم </h1> </div>
+        <div className="flex items-center gap-2">
+          <SidebarTrigger />
+          <h1 className="text-3xl font-bold text-primary">لوحة التحكم</h1>
+        </div>
         <div className="flex gap-2 flex-wrap justify-center">
-          <Button onClick={() => handleOpenDialog(null)}> <Plus className="ml-2 h-4 w-4" /> إضافة عملية </Button>
-          <Button variant="outline" onClick={() => handleOpenExpenseDialog(null)}> <MinusCircle className="ml-2 h-4 w-4" /> إضافة مصروف </Button>
-          <Button variant="outline" onClick={handleExport}> <Download className="ml-2 h-4 w-4" /> تصدير CSV </Button>
-          <Button variant="outline" onClick={() => handleOpenPaymentDialog(null)}> <Landmark className="ml-2 h-4 w-4" /> تسجيل دفعة </Button>
-          <Button onClick={() => setIsTransferDialogOpen(true)}> <ArrowRightLeft className="ml-2 h-4 w-4" /> تحويل رصيد </Button>
+          <Button onClick={() => handleOpenDialog(null)}><Plus className="ml-2 h-4 w-4" />إضافة عملية</Button>
+          <Button variant="outline" onClick={() => handleOpenExpenseDialog(null)}><MinusCircle className="ml-2 h-4 w-4" />إضافة مصروف</Button>
+          <Button variant="outline" onClick={handleExport}><Download className="ml-2 h-4 w-4" />تصدير CSV</Button>
         </div>
       </header>
 
@@ -528,14 +441,8 @@ export default function AccountingDashboard() {
                           )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                           <FormItem>
-                             <Label>إجمالي سعر الشراء</Label>
-                             <Input type="number" value={totalPurchasePriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" />
-                           </FormItem>
-                           <FormItem>
-                             <Label>إجمالي سعر البيع</Label>
-                             <Input type="number" value={totalSellingPriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" />
-                           </FormItem>
+                           <FormItem><Label>إجمالي سعر الشراء</Label><Input type="number" value={totalPurchasePriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" /></FormItem>
+                           <FormItem><Label>إجمالي سعر البيع</Label><Input type="number" value={totalSellingPriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" /></FormItem>
                         </div>
                         <FormItem className="mt-4">
                            <Label>صافي الربح</Label>
@@ -564,7 +471,7 @@ export default function AccountingDashboard() {
                     </AccordionItem>
                   </Accordion>
                   <DialogFooter className="pt-4">
-                    {editingTransaction && ( <AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" className="mr-auto"><Trash2 className="ml-2 h-4 w-4" />حذف</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle><AlertDialogDescription>هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف العملية بشكل دائم.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={async () => { if (editingTransaction) { await handleDeleteTransaction(editingTransaction.id); setIsDialogOpen(false); setEditingTransaction(null); } }}>متابعة</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog> )}
+                    {editingTransaction && (<AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" className="mr-auto"><Trash2 className="ml-2 h-4 w-4" />حذف</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle><AlertDialogDescription>هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف العملية بشكل دائم.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={async () => { if (editingTransaction) { await handleDeleteTransaction(editingTransaction.id); setIsDialogOpen(false); setEditingTransaction(null); } }}>متابعة</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>)}
                     <DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose>
                     <Button type="submit">{editingTransaction ? 'حفظ التعديلات' : 'حفظ العملية'}</Button>
                   </DialogFooter>
@@ -599,47 +506,8 @@ export default function AccountingDashboard() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-            <DialogContent className="sm:max-w-2xl">
-              <DialogHeader><DialogTitle>{editingPayment ? 'تعديل دفعة لمورد' : 'تسجيل دفعة لمورد'}</DialogTitle></DialogHeader>
-              <Form {...paymentForm}>
-                <form onSubmit={paymentForm.handleSubmit(onSubmitPayment)} className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={paymentForm.control} name="date" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>تاريخ الصرف</FormLabel><Popover modal={false} open={isPaymentDatePopoverOpen} onOpenChange={setIsPaymentDatePopoverOpen}><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="ml-2 h-4 w-4"/>{field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}</Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={field.value} onSelect={(d) => { field.onChange(d); setIsPaymentDatePopoverOpen(false); }} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                    <FormField control={paymentForm.control} name="supplierName" render={({ field }) => (<FormItem><FormLabel>اسم المورد</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                    <FormField control={paymentForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>المبلغ المصروف</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={paymentForm.control} name="responsiblePerson" render={({ field }) => (<FormItem><FormLabel>القائم بالتحويل</FormLabel><FormControl><Input placeholder="اسم المسؤول" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  </div>
-                  <FormField control={paymentForm.control} name="method" render={({ field }) => (<FormItem className="space-y-3"><FormLabel>طريقة التحويل</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="نقدي" /></FormControl><FormLabel className="font-normal">نقدي</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="بنكي" /></FormControl><FormLabel className="font-normal">بنكي</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />
-                  {paymentMethodWatcher === 'بنكي' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md"><FormField control={paymentForm.control} name="sourceBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول منه</FormLabel><FormControl><Input placeholder="حساب الشركة" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} /><FormField control={paymentForm.control} name="destinationBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول إليه</FormLabel><FormControl><Input placeholder="بنك المورد" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} /></div>)}
-                  <FormField control={paymentForm.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للصرف..." {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  <FormField control={paymentForm.control} name="document" render={({ field: { onChange, ...rest } }) => (<FormItem><FormLabel>رفع مستند التحويل (اختياري)</FormLabel><FormControl><Input type="file" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl><FormMessage /></FormItem>)} />
-                  {editingPayment?.documentUrl && !paymentDocumentWatcher?.length && (<div className="text-sm"><span className="font-medium">المستند الحالي: </span><a href={editingPayment.documentUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">عرض المستند</a><p className="text-xs text-muted-foreground">للتغيير، قم برفع ملف جديد.</p></div>)}
-                  <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose><Button type="submit">{editingPayment ? 'حفظ التعديلات' : 'تسجيل الدفعة'}</Button></DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader><DialogTitle>تحويل رصيد بين الموردين</DialogTitle></DialogHeader>
-              <Form {...transferForm}>
-                <form onSubmit={transferForm.handleSubmit(onSubmitTransfer)} className="grid gap-4 py-4">
-                  <FormField control={transferForm.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>تاريخ التحويل</FormLabel><Popover modal={false} open={isTransferDatePopoverOpen} onOpenChange={setIsTransferDatePopoverOpen}><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="ml-2 h-4 w-4" />{field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}</Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={field.value} onSelect={(d) => { field.onChange(d); setIsTransferDatePopoverOpen(false); }} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                  <FormField control={transferForm.control} name="fromSupplier" render={({ field }) => (<FormItem><FormLabel>المورد المحول منه</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                  <FormField control={transferForm.control} name="toSupplier" render={({ field }) => (<FormItem><FormLabel>المورد المحول إليه</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                  <FormField control={transferForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>المبلغ المحول</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  <FormField control={transferForm.control} name="method" render={({ field }) => (<FormItem><FormLabel>طريقة التحويل</FormLabel><FormControl><Input placeholder="مثال: تحويل بنكي" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  <FormField control={transferForm.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للتحويل..." {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose><Button type="submit">حفظ التحويل</Button></DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
-        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">إجمالي المستلم من الموردين</CardTitle><Landmark className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold text-success">{totalReceivedFromSuppliers.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">إجمالي المستلم من الموردين</CardTitle><Wallet className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold text-success">{totalReceivedFromSuppliers.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">إجمالي المدفوع للمصنع</CardTitle><Factory className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold text-primary">{totalPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">إجمالي المشتريات</CardTitle><ShoppingCart className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalPurchases.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">إجمالي المبيعات</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</div></CardContent></Card>
@@ -717,59 +585,6 @@ export default function AccountingDashboard() {
                </div>
             </CardContent>
           </Card>
-          
-          {sortedPayments.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>سجل الدفعات للموردين</CardTitle></CardHeader>
-              <CardContent>
-                <div className="relative w-full overflow-auto max-h-96">
-                  <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-                    <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المورد</TableHead><TableHead>المبلغ</TableHead><TableHead>الطريقة</TableHead><TableHead>السبب</TableHead><TableHead>المسؤول</TableHead><TableHead>المستند</TableHead><TableHead>إجراء</TableHead></TableRow></TableHeader>
-                    <TableBody>{sortedPayments.map(p => (
-                        <TableRow key={p.id}>
-                          <TableCell>{format(new Date(p.date), 'dd MMMM yyyy', { locale: ar })}</TableCell>
-                          <TableCell className="font-medium">{p.supplierName}</TableCell>
-                          <TableCell className="font-bold text-destructive">{p.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                          <TableCell>{p.method}</TableCell>
-                          <TableCell>{p.reason}</TableCell>
-                          <TableCell>{p.responsiblePerson}</TableCell>
-                          <TableCell>{p.documentUrl ? (<Button asChild variant="link" className="p-0 h-auto"><a href={p.documentUrl} target="_blank" rel="noopener noreferrer"><FileIcon className="w-4 h-4" /></a></Button>) : ('-')}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(p)} title="تعديل الدفعة"><Pencil className="h-4 w-4" /></Button>
-                              <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" title="حذف الدفعة"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف هذه الدفعة ومستندها المرفق بشكل دائم.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePayment(p.id)}>متابعة</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}</TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {sortedTransfers.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>سجل تحويلات الأرصدة</CardTitle></CardHeader>
-              <CardContent>
-                <div className="relative w-full overflow-auto max-h-96">
-                  <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-                    <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المحول منه</TableHead><TableHead>المحول إليه</TableHead><TableHead>المبلغ</TableHead><TableHead>السبب</TableHead><TableHead>الطريقة</TableHead></TableRow></TableHeader>
-                    <TableBody>{sortedTransfers.map(t => (
-                        <TableRow key={t.id}>
-                          <TableCell>{format(new Date(t.date), 'dd MMMM yyyy', { locale: ar })}</TableCell>
-                          <TableCell className="font-medium text-destructive">{t.fromSupplier}</TableCell>
-                          <TableCell className="font-medium text-success">{t.toSupplier}</TableCell>
-                          <TableCell className="font-bold">{t.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                          <TableCell>{t.reason}</TableCell>
-                          <TableCell>{t.method}</TableCell>
-                        </TableRow>
-                      ))}</TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
        </div>
     </div>
   );
