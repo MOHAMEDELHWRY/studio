@@ -109,7 +109,7 @@ export default function ShareableSupplierReport() {
     }, 0);
 
     const finalSalesBalance = (stats.totalReceivedFromSupplier + transferAdjustment) - stats.totalSales;
-    const finalCashFlowBalance = (stats.totalReceivedFromSupplier + transferAdjustment) - stats.totalPaidToFactory;
+    const finalCashFlowBalance = (stats.totalReceivedFromSupplier + transferAdjustment) - (stats.totalPaidToFactory - stats.totalPurchases);
     const finalFactoryBalance = stats.totalPaidToFactory - stats.totalPurchases;
 
     // Apply adjustment for display
@@ -129,7 +129,7 @@ export default function ShareableSupplierReport() {
     combinedEvents.forEach(event => {
         if (event.type === 'transaction') {
             runningSales += event.amountReceivedFromSupplier - event.totalSellingPrice;
-            runningCash += event.amountReceivedFromSupplier - event.amountPaidToFactory;
+            runningCash += event.amountReceivedFromSupplier - (event.amountPaidToFactory - event.totalPurchasePrice);
             runningFactory += event.amountPaidToFactory - event.totalPurchasePrice;
         } else if (event.type === 'transfer') {
             const amount = event.toSupplier === supplierName ? event.amount : -event.amount;

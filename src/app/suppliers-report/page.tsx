@@ -75,7 +75,7 @@ export default function SuppliersReportPage() {
       const adjustedTotalReceived = totalReceivedFromSupplier + transferAdj - paymentAdj;
 
       const finalSalesBalance = adjustedTotalReceived - totalSales;
-      const finalCashFlowBalance = adjustedTotalReceived - totalPaidToFactory;
+      const finalCashFlowBalance = adjustedTotalReceived - (totalPaidToFactory - totalPurchases);
       const finalFactoryBalance = totalPaidToFactory - totalPurchases;
       const remainingQuantity = totalQuantityPurchased - totalQuantitySold;
 
