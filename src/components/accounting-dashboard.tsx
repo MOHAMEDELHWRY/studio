@@ -299,11 +299,13 @@ export default function AccountingDashboard() {
   
   const onSubmitPayment = async (values: PaymentFormValues) => {
     const documentFile = values.document?.[0];
+    const { document, ...restOfValues } = values;
+
     if (editingPayment) {
-        const updatedPaymentData: SupplierPayment = { ...editingPayment, ...values, documentUrl: editingPayment.documentUrl };
+        const updatedPaymentData: SupplierPayment = { ...editingPayment, ...restOfValues, documentUrl: editingPayment.documentUrl };
         await updateSupplierPayment(updatedPaymentData, documentFile);
     } else {
-      const newPaymentData: Omit<SupplierPayment, 'id'> = { ...values, documentUrl: '' };
+      const newPaymentData: Omit<SupplierPayment, 'id'> = { ...restOfValues, documentUrl: '' };
       await addSupplierPayment(newPaymentData, documentFile);
     }
 

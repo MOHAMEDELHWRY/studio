@@ -143,8 +143,8 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const docData = {
         ...transaction,
         date: transaction.date.toISOString(),
-        executionDate: transaction.executionDate?.toISOString(),
-        dueDate: transaction.dueDate?.toISOString(),
+        executionDate: transaction.executionDate?.toISOString() || null,
+        dueDate: transaction.dueDate?.toISOString() || null,
       };
       const docRef = await addDoc(transactionsCollectionRef, docData);
       setTransactions(prev => [{ ...transaction, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
@@ -162,8 +162,8 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const docData = {
         ...dataToUpdate,
         date: updatedTransaction.date.toISOString(),
-        executionDate: updatedTransaction.executionDate?.toISOString(),
-        dueDate: updatedTransaction.dueDate?.toISOString(),
+        executionDate: updatedTransaction.executionDate?.toISOString() || null,
+        dueDate: updatedTransaction.dueDate?.toISOString() || null,
       };
       await updateDoc(transactionDoc, docData as any);
       setTransactions(prev => 
