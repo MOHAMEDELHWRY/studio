@@ -41,6 +41,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -503,10 +504,19 @@ export default function AccountingDashboard() {
                           <FormField control={form.control} name="sellingPrice" render={({ field }) => ( <FormItem> <FormLabel>سعر البيع</FormLabel> <FormControl> <Input type="number" {...field} /> </FormControl> <FormMessage /> </FormItem> )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                           <FormItem> <FormLabel>إجمالي سعر الشراء</FormLabel> <FormControl> <Input type="number" value={totalPurchasePriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" /> </FormControl> </FormItem>
-                           <FormItem> <FormLabel>إجمالي سعر البيع</FormLabel> <FormControl> <Input type="number" value={totalSellingPriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" /> </FormControl> </FormItem>
+                           <FormItem>
+                             <Label>إجمالي سعر الشراء</Label>
+                             <Input type="number" value={totalPurchasePriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" />
+                           </FormItem>
+                           <FormItem>
+                             <Label>إجمالي سعر البيع</Label>
+                             <Input type="number" value={totalSellingPriceDisplay.toFixed(2)} readOnly className="font-bold bg-muted" />
+                           </FormItem>
                         </div>
-                        <FormItem className="mt-4"> <FormLabel>صافي الربح</FormLabel> <FormControl> <Input type="number" value={profitDisplay.toFixed(2)} readOnly className={`font-bold ${profitDisplay >= 0 ? 'bg-success/20' : 'bg-destructive/20'}`} /> </FormControl> </FormItem>
+                        <FormItem className="mt-4">
+                           <Label>صافي الربح</Label>
+                           <Input type="number" value={profitDisplay.toFixed(2)} readOnly className={`font-bold ${profitDisplay >= 0 ? 'bg-success/20' : 'bg-destructive/20'}`} />
+                        </FormItem>
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-3">
