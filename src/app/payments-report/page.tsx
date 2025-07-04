@@ -87,7 +87,16 @@ export default function PaymentsReportPage() {
   
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
-    defaultValues: { date: new Date(), amount: 0, supplierName: "", method: 'نقدي', reason: "", responsiblePerson: "" },
+    defaultValues: {
+      date: new Date(),
+      amount: 0,
+      supplierName: "",
+      method: 'نقدي',
+      reason: "",
+      responsiblePerson: "",
+      sourceBank: "",
+      destinationBank: "",
+    },
   });
   const paymentMethodWatcher = form.watch('method');
   const paymentDocumentWatcher = form.watch('document');
@@ -98,9 +107,20 @@ export default function PaymentsReportPage() {
       form.reset({
           ...payment,
           date: new Date(payment.date),
+          sourceBank: payment.sourceBank ?? "",
+          destinationBank: payment.destinationBank ?? "",
       });
     } else {
-      form.reset({ date: new Date(), amount: 0, supplierName: "", method: 'نقدي', reason: "", responsiblePerson: "" });
+      form.reset({
+        date: new Date(),
+        amount: 0,
+        supplierName: "",
+        method: 'نقدي',
+        reason: "",
+        responsiblePerson: "",
+        sourceBank: "",
+        destinationBank: "",
+      });
     }
     setIsDialogOpen(true);
   };
@@ -197,7 +217,7 @@ export default function PaymentsReportPage() {
                     <FormField control={form.control} name="responsiblePerson" render={({ field }) => (<FormItem><FormLabel>القائم بالتحويل</FormLabel><FormControl><Input placeholder="اسم المسؤول" {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
                   <FormField control={form.control} name="method" render={({ field }) => (<FormItem className="space-y-3"><FormLabel>طريقة التحويل</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="نقدي" /></FormControl><FormLabel className="font-normal">نقدي</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="بنكي" /></FormControl><FormLabel className="font-normal">بنكي</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />
-                  {paymentMethodWatcher === 'بنكي' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md"><FormField control={form.control} name="sourceBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول منه</FormLabel><FormControl><Input placeholder="حساب الشركة" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="destinationBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول إليه</FormLabel><FormControl><Input placeholder="بنك المورد" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} /></div>)}
+                  {paymentMethodWatcher === 'بنكي' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md"><FormField control={form.control} name="sourceBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول منه</FormLabel><FormControl><Input placeholder="حساب الشركة" {...field} /></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="destinationBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول إليه</FormLabel><FormControl><Input placeholder="بنك المورد" {...field} /></FormControl><FormMessage /></FormItem>)} /></div>)}
                   <FormField control={form.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للصرف..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="document" render={({ field: { onChange, ...rest } }) => (<FormItem><FormLabel>رفع مستند التحويل (اختياري)</FormLabel><FormControl><Input type="file" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl><FormMessage /></FormItem>)} />
                   {editingPayment?.documentUrl && !paymentDocumentWatcher?.length && (<div className="text-sm"><span className="font-medium">المستند الحالي: </span><a href={editingPayment.documentUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">عرض المستند</a><p className="text-xs text-muted-foreground">للتغيير، قم برفع ملف جديد.</p></div>)}
