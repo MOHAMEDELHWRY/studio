@@ -37,6 +37,7 @@ export type BalanceTransfer = {
   toSupplier: string;
   reason: string;
   method: string;
+  classification: string;
 };
 
 export type SupplierPayment = {

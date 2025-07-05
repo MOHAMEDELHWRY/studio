@@ -64,6 +64,7 @@ const transferSchema = z.object({
   toSupplier: z.string().min(1, "يجب اختيار المورد المحول إليه."),
   reason: z.string().trim().min(1, "يجب كتابة سبب التحويل."),
   method: z.string().trim().min(1, "يجب تحديد طريقة التحويل."),
+  classification: z.string().min(1, "يجب تحديد تصنيف التحويل."),
 }).refine(data => data.fromSupplier !== data.toSupplier, {
   message: "لا يمكن التحويل إلى نفس المورد.",
   path: ["toSupplier"],
@@ -91,6 +92,7 @@ export default function TransfersReportPage() {
       toSupplier: "",
       reason: "",
       method: "تحويل بنكي",
+      classification: "تسوية رصيد مبيعات",
     },
   });
   
@@ -109,6 +111,7 @@ export default function TransfersReportPage() {
         toSupplier: "",
         reason: "",
         method: "تحويل بنكي",
+        classification: "تسوية رصيد مبيعات",
       });
     }
     setIsDialogOpen(true);
@@ -195,6 +198,20 @@ export default function TransfersReportPage() {
               <FormField control={form.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>تاريخ التحويل</FormLabel><Popover modal={false} open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="ml-2 h-4 w-4" />{field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}</Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={field.value} onSelect={(d) => { field.onChange(d); setIsDatePopoverOpen(false); }} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="fromSupplier" render={({ field }) => (<FormItem><FormLabel>المورد المحول منه</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="toSupplier" render={({ field }) => (<FormItem><FormLabel>المورد المحول إليه</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="classification" render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>تصنيف التحويل</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="اختر التصنيف..." /></SelectTrigger></FormControl>
+                          <SelectContent>
+                              <SelectItem value="تسوية رصيد مبيعات">تسوية رصيد مبيعات</SelectItem>
+                              <SelectItem value="تسوية رصيد مصنع">تسوية رصيد مصنع</SelectItem>
+                              <SelectItem value="تحويل عام">تحويل عام</SelectItem>
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                  </FormItem>
+              )} />
               <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>المبلغ المحول</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="method" render={({ field }) => (<FormItem><FormLabel>طريقة التحويل</FormLabel><FormControl><Input placeholder="مثال: تحويل بنكي" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للتحويل..." {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -214,7 +231,7 @@ export default function TransfersReportPage() {
         <CardContent>
            <div className="relative w-full overflow-auto">
             <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-              <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المحول منه</TableHead><TableHead>المحول إليه</TableHead><TableHead>المبلغ</TableHead><TableHead>السبب</TableHead><TableHead>الطريقة</TableHead><TableHead>إجراءات</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المحول منه</TableHead><TableHead>المحول إليه</TableHead><TableHead>المبلغ</TableHead><TableHead>التصنيف</TableHead><TableHead>السبب</TableHead><TableHead>الطريقة</TableHead><TableHead>إجراءات</TableHead></TableRow></TableHeader>
               <TableBody>
                 {sortedTransfers.length > 0 ? (
                   sortedTransfers.map(t => (
@@ -223,6 +240,7 @@ export default function TransfersReportPage() {
                       <TableCell className="font-medium text-destructive">{t.fromSupplier}</TableCell>
                       <TableCell className="font-medium text-success">{t.toSupplier}</TableCell>
                       <TableCell className="font-bold">{t.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell>{t.classification}</TableCell>
                       <TableCell>{t.reason}</TableCell>
                       <TableCell>{t.method}</TableCell>
                       <TableCell>
@@ -243,7 +261,7 @@ export default function TransfersReportPage() {
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={7} className="h-24 text-center">لا توجد تحويلات مسجلة.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="h-24 text-center">لا توجد تحويلات مسجلة.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

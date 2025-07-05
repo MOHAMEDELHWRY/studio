@@ -107,6 +107,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
             ...data,
             id: doc.id,
             date: new Date(data.date),
+            classification: data.classification || 'تحويل عام',
           } as BalanceTransfer;
         });
         setBalanceTransfers(fetchedTransfers.sort((a, b) => b.date.getTime() - a.date.getTime()));
@@ -347,7 +348,6 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       }
       
       setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
-      toast({ title: "نجاح", description: "تم تسجيل الدفعة بنجاح." });
     } catch (error) {
       console.error("Error adding supplier payment: ", error);
       toast({ title: "خطأ", description: "لم نتمكن من تسجيل الدفعة.", variant: "destructive" });
