@@ -52,14 +52,21 @@ export default function SuppliersReportPage() {
       transferAdjustments.set(transfer.toSupplier, (transferAdjustments.get(transfer.toSupplier) || 0) + transfer.amount);
     });
 
-    const paymentAdjustments = new Map<string, number>();
+    const salesPaymentAdjustments = new Map<string, number>();
+    const factoryPaymentAdjustments = new Map<string, number>();
+
     supplierPayments.forEach(payment => {
-      paymentAdjustments.set(payment.supplierName, (paymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
+      if (payment.deductFrom === 'رصيد المصنع') {
+        factoryPaymentAdjustments.set(payment.supplierName, (factoryPaymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
+      } else { // Default to sales balance
+        salesPaymentAdjustments.set(payment.supplierName, (salesPaymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
+      }
     });
 
     const summaries: SupplierSummary[] = Object.keys(supplierData).map(supplierName => {
       const supplierTransactions = supplierData[supplierName];
       let totalSales = 0, totalPurchases = 0, totalPaidToFactory = 0, totalReceivedFromSupplier = 0, totalQuantityPurchased = 0, totalQuantitySold = 0, remainingStockValue = 0;
+      
       supplierTransactions.forEach(t => {
         totalSales += t.totalSellingPrice;
         totalPurchases += t.totalPurchasePrice;
@@ -71,12 +78,15 @@ export default function SuppliersReportPage() {
       });
       
       const transferAdj = transferAdjustments.get(supplierName) || 0;
-      const paymentAdj = paymentAdjustments.get(supplierName) || 0;
-      const adjustedTotalReceived = totalReceivedFromSupplier + transferAdj - paymentAdj;
+      const salesPaymentAdj = salesPaymentAdjustments.get(supplierName) || 0;
+      const factoryPaymentAdj = factoryPaymentAdjustments.get(supplierName) || 0;
+      
+      const adjustedTotalReceived = totalReceivedFromSupplier + transferAdj - salesPaymentAdj;
+      const adjustedTotalPaidToFactory = totalPaidToFactory + factoryPaymentAdj;
 
       const finalSalesBalance = adjustedTotalReceived - totalSales;
-      const finalCashFlowBalance = adjustedTotalReceived - (totalPaidToFactory - totalPurchases);
-      const finalFactoryBalance = totalPaidToFactory - totalPurchases;
+      const finalCashFlowBalance = adjustedTotalReceived - (adjustedTotalPaidToFactory - totalPurchases);
+      const finalFactoryBalance = adjustedTotalPaidToFactory - totalPurchases;
       const remainingQuantity = totalQuantityPurchased - totalQuantitySold;
 
       return {

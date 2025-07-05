@@ -46,6 +46,7 @@ export type SupplierPayment = {
   amount: number;
   supplierName: string;
   method: 'نقدي' | 'بنكي';
+  deductFrom: 'رصيد المبيعات' | 'رصيد المصنع';
   sourceBank?: string;
   destinationBank?: string;
   reason: string;

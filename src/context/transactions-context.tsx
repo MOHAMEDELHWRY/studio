@@ -120,6 +120,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
             ...data,
             id: doc.id,
             date: new Date(data.date),
+            deductFrom: data.deductFrom || 'رصيد المبيعات',
           } as SupplierPayment;
         });
         setSupplierPayments(fetchedPayments.sort((a, b) => b.date.getTime() - a.date.getTime()));
