@@ -10,32 +10,12 @@ import { Printer } from 'lucide-react';
 
 export default function ShareableSupplierReport() {
   const params = useParams();
-  const { transactions, balanceTransfers } = useTransactions();
+  const { transactions, balanceTransfers, supplierPayments } = useTransactions();
 
   const supplierName = useMemo(() => {
     const name = params.supplierName;
     return typeof name === 'string' ? decodeURIComponent(name) : '';
   }, [params.supplierName]);
-
-  const supplierTransactionsAsc = useMemo(() => {
-    if (!supplierName) return [];
-    return transactions
-      .filter(t => t.supplierName === supplierName)
-      .sort((a, b) => {
-        const dateA = a.date.getTime();
-        const dateB = b.date.getTime();
-        if (dateA !== dateB) {
-            return dateA - dateB;
-        }
-        return a.id.localeCompare(b.id);
-      });
-  }, [transactions, supplierName]);
-
-  const supplierRelatedTransfers = useMemo(() => {
-    return balanceTransfers
-      .filter(t => t.fromSupplier === supplierName || t.toSupplier === supplierName)
-      .sort((a,b) => b.date.getTime() - a.date.getTime());
-  }, [balanceTransfers, supplierName]);
   
   const { 
     transactionsWithBalances, 
@@ -43,122 +23,121 @@ export default function ShareableSupplierReport() {
     tonBreakdown, 
     finalSalesBalance, 
     finalCashFlowBalance, 
-    finalFactoryBalance 
+    finalFactoryBalance,
+    supplierRelatedTransfers
   } = useMemo(() => {
-    let runningSalesBalance = 0;
-    let runningCashFlowBalance = 0;
-    let runningFactoryBalance = 0;
+    if (!supplierName) {
+      return {
+        transactionsWithBalances: [],
+        supplierStats: { totalPurchases: 0, totalSales: 0, totalPaidToFactory: 0, totalReceivedFromSupplier: 0, totalTonsPurchased: 0, totalTonsSold: 0 },
+        tonBreakdown: { byCategory: {}, byVariety: {} },
+        finalSalesBalance: 0,
+        finalCashFlowBalance: 0,
+        finalFactoryBalance: 0,
+        supplierRelatedTransfers: []
+      };
+    }
 
+    // --- 1. Filter data for the current supplier ---
+    const supplierTransactions = transactions.filter(t => t.supplierName === supplierName);
+    const relatedTransfers = balanceTransfers.filter(t => t.fromSupplier === supplierName || t.toSupplier === supplierName);
+    const relatedSalesPayments = supplierPayments.filter(p => p.supplierName === supplierName && p.deductFrom === 'رصيد المبيعات');
+    const relatedFactoryPayments = supplierPayments.filter(p => p.supplierName === supplierName && p.deductFrom === 'رصيد المصنع');
+
+    // --- 2. Calculate static stats (like tons and totals for cards) ---
     const stats = { 
-      totalPurchases: 0, 
-      totalSales: 0, 
-      totalPaidToFactory: 0, 
-      totalReceivedFromSupplier: 0,
-      totalTonsPurchased: 0,
-      totalTonsSold: 0
+      totalPurchases: 0, totalSales: 0, totalPaidToFactory: 0, totalReceivedFromSupplier: 0,
+      totalTonsPurchased: 0, totalTonsSold: 0
     };
-
     const breakdown: {
         byCategory: { [key: string]: { purchased: number; sold: number } },
         byVariety: { [key: string]: { purchased: number; sold: number } }
-    } = {
-        byCategory: {},
-        byVariety: {}
-    };
+    } = { byCategory: {}, byVariety: {} };
 
-    supplierTransactionsAsc.forEach(t => {
-      // Aggregate main stats
+    supplierTransactions.forEach(t => {
       stats.totalPurchases += t.totalPurchasePrice;
       stats.totalSales += t.totalSellingPrice;
-      stats.totalPaidToFactory += t.amountPaidToFactory;
-      stats.totalReceivedFromSupplier += t.amountReceivedFromSupplier;
       stats.totalTonsPurchased += t.quantity;
-
       const isSold = t.totalSellingPrice > 0;
-      if (isSold) {
-        stats.totalTonsSold += t.quantity;
-      }
-
-      // Category breakdown
+      if (isSold) stats.totalTonsSold += t.quantity;
       if (t.category) {
-          if (!breakdown.byCategory[t.category]) {
-              breakdown.byCategory[t.category] = { purchased: 0, sold: 0 };
-          }
+          if (!breakdown.byCategory[t.category]) breakdown.byCategory[t.category] = { purchased: 0, sold: 0 };
           breakdown.byCategory[t.category].purchased += t.quantity;
-          if (isSold) {
-              breakdown.byCategory[t.category].sold += t.quantity;
-          }
+          if (isSold) breakdown.byCategory[t.category].sold += t.quantity;
       }
-
-      // Variety breakdown
       if (t.variety) {
-          if (!breakdown.byVariety[t.variety]) {
-              breakdown.byVariety[t.variety] = { purchased: 0, sold: 0 };
-          }
+          if (!breakdown.byVariety[t.variety]) breakdown.byVariety[t.variety] = { purchased: 0, sold: 0 };
           breakdown.byVariety[t.variety].purchased += t.quantity;
-          if (isSold) {
-              breakdown.byVariety[t.variety].sold += t.quantity;
-          }
+          if (isSold) breakdown.byVariety[t.variety].sold += t.quantity;
       }
     });
 
-    const transferAdjustment = supplierRelatedTransfers.reduce((acc, t) => {
-        if (t.toSupplier === supplierName) return acc + t.amount;
-        if (t.fromSupplier === supplierName) return acc - t.amount;
-        return acc;
-    }, 0);
-
-    const finalSalesBalance = (stats.totalReceivedFromSupplier + transferAdjustment) - stats.totalSales;
-    const finalCashFlowBalance = (stats.totalReceivedFromSupplier + transferAdjustment) - (stats.totalPaidToFactory - stats.totalPurchases);
-    const finalFactoryBalance = stats.totalPaidToFactory - stats.totalPurchases;
-
-    // Apply adjustment for display
-    stats.totalReceivedFromSupplier += transferAdjustment;
-
-    // Create a combined list of transactions and transfers for running balance calculation
+    // --- 3. Combine all events into a single chronological timeline ---
     const combinedEvents = [
-        ...supplierTransactionsAsc.map(t => ({...t, type: 'transaction'})),
-        ...supplierRelatedTransfers.map(t => ({...t, type: 'transfer'}))
-    ].sort((a,b) => a.date.getTime() - b.date.getTime());
+        ...supplierTransactions.map(t => ({ id: t.id, date: t.date, type: 'transaction', payload: t })),
+        ...relatedTransfers.map(t => ({ id: t.id, date: t.date, type: 'transfer', payload: t })),
+        ...relatedSalesPayments.map(p => ({ id: p.id, date: p.date, type: 'sales_payment', payload: p })),
+        ...relatedFactoryPayments.map(p => ({ id: p.id, date: p.date, type: 'factory_payment', payload: p })),
+    ].sort((a,b) => {
+        const dateA = a.date.getTime();
+        const dateB = b.date.getTime();
+        if (dateA !== dateB) return dateA - dateB;
+        return a.id.localeCompare(b.id);
+    });
 
-    let runningSales = 0;
-    let runningCash = 0;
-    let runningFactory = 0;
+    // --- 4. Calculate running balances ---
+    let runningSales = 0, runningCash = 0, runningFactory = 0;
     const eventBalances = new Map<string, { sales: number; cash: number; factory: number }>();
     
     combinedEvents.forEach(event => {
         if (event.type === 'transaction') {
-            runningSales += event.amountReceivedFromSupplier - event.totalSellingPrice;
-            runningCash += event.amountReceivedFromSupplier - (event.amountPaidToFactory - event.totalPurchasePrice);
-            runningFactory += event.amountPaidToFactory - event.totalPurchasePrice;
+            const t = event.payload;
+            runningSales += t.amountReceivedFromSupplier - t.totalSellingPrice;
+            runningFactory += t.amountPaidToFactory - t.totalPurchasePrice;
         } else if (event.type === 'transfer') {
-            const amount = event.toSupplier === supplierName ? event.amount : -event.amount;
+            const amount = event.payload.toSupplier === supplierName ? event.payload.amount : -event.payload.amount;
             runningSales += amount;
-            runningCash += amount;
+        } else if (event.type === 'sales_payment') {
+            runningSales -= event.payload.amount;
+        } else if (event.type === 'factory_payment') {
+            runningFactory += event.payload.amount;
         }
+        runningCash = runningSales - runningFactory;
         eventBalances.set(event.id, { sales: runningSales, cash: runningCash, factory: runningFactory });
     });
 
+    // --- 5. Prepare data for display ---
+    const transactionsWithBalances = supplierTransactions
+      .map(t => {
+        const balances = eventBalances.get(t.id) || { sales: 0, cash: 0, factory: 0 };
+        return { 
+            ...t, 
+            salesRunningBalance: balances.sales, 
+            cashFlowRunningBalance: balances.cash, 
+            factoryRunningBalance: balances.factory 
+        };
+      })
+      .sort((a,b) => {
+          const dateA = a.date.getTime();
+          const dateB = b.date.getTime();
+          if (dateA !== dateB) return b.date.getTime() - a.date.getTime();
+          return b.id.localeCompare(a.id);
+      });
 
-    const transactionsWithBalances = supplierTransactionsAsc.map(t => {
-      const balances = eventBalances.get(t.id) || { sales: 0, cash: 0, factory: 0 };
-      return { 
-          ...t, 
-          salesRunningBalance: balances.sales, 
-          cashFlowRunningBalance: balances.cash, 
-          factoryRunningBalance: balances.factory 
-      };
-    }).reverse();
-
+    // Update the main `stats` object with final balances for the summary cards
+    stats.totalReceivedFromSupplier = runningSales + stats.totalSales;
+    stats.totalPaidToFactory = runningFactory + stats.totalPurchases;
+    
     return { 
       transactionsWithBalances, 
       supplierStats: stats, 
-      tonBreakdown: breakdown,
-      finalSalesBalance,
-      finalCashFlowBalance,
-      finalFactoryBalance,
+      tonBreakdown,
+      finalSalesBalance: runningSales,
+      finalCashFlowBalance: runningCash,
+      finalFactoryBalance: runningFactory,
+      supplierRelatedTransfers: relatedTransfers.sort((a, b) => b.date.getTime() - a.date.getTime())
     };
-  }, [supplierTransactionsAsc, supplierRelatedTransfers, supplierName]);
+  }, [transactions, balanceTransfers, supplierPayments, supplierName]);
 
 
   if (!supplierName) {
@@ -210,7 +189,7 @@ export default function ShareableSupplierReport() {
                   <p className="text-base sm:text-xl font-bold text-gray-800">{supplierStats.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
                <div className="p-2 sm:p-4 border rounded-lg">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم (بعد التحويلات)</h3>
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم (بعد الدفعات)</h3>
                   <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">

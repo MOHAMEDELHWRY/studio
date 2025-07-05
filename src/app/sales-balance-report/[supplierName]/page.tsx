@@ -10,52 +10,95 @@ import { Printer } from 'lucide-react';
 
 export default function SimplifiedSalesReport() {
   const params = useParams();
-  const { transactions, balanceTransfers } = useTransactions();
+  const { transactions, balanceTransfers, supplierPayments } = useTransactions();
 
   const supplierName = useMemo(() => {
     const name = params.supplierName;
     return typeof name === 'string' ? decodeURIComponent(name) : '';
   }, [params.supplierName]);
 
-  const { transactionsWithBalances, supplierStats } = useMemo(() => {
+  const { transactionsWithBalances, finalSalesBalance, supplierStats } = useMemo(() => {
     if (!supplierName) {
         return { 
             transactionsWithBalances: [],
+            finalSalesBalance: 0,
             supplierStats: { totalSales: 0, totalReceivedFromSupplier: 0 }
         };
     }
 
-    const supplierTransactionsAsc = transactions
-      .filter(t => t.supplierName === supplierName)
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    const supplierTransactions = transactions
+      .filter(t => t.supplierName === supplierName);
     
-    const transferAdjustment = balanceTransfers.reduce((acc, t) => {
-        if (t.toSupplier === supplierName) return acc + t.amount;
-        if (t.fromSupplier === supplierName) return acc - t.amount;
-        return acc;
-    }, 0);
-      
-    const stats = supplierTransactionsAsc.reduce((acc, t) => {
-      acc.totalSales += t.totalSellingPrice;
-      acc.totalReceivedFromSupplier += t.amountReceivedFromSupplier;
-      return acc;
-    }, { 
-      totalSales: 0, 
-      totalReceivedFromSupplier: 0,
+    // Combine all events that affect the sales balance
+    const combinedEvents = [
+      ...supplierTransactions.map(t => ({
+        id: t.id,
+        date: t.date,
+        type: 'transaction',
+        payload: t
+      })),
+      ...balanceTransfers
+        .filter(t => t.fromSupplier === supplierName || t.toSupplier === supplierName)
+        .map(t => ({
+          id: t.id,
+          date: t.date,
+          type: 'transfer',
+          payload: t
+        })),
+      ...supplierPayments
+        .filter(p => p.supplierName === supplierName && p.deductFrom === 'رصيد المبيعات')
+        .map(p => ({
+          id: p.id,
+          date: p.date,
+          type: 'payment',
+          payload: p
+        }))
+    ].sort((a, b) => {
+      const dateA = a.date.getTime();
+      const dateB = b.date.getTime();
+      if (dateA !== dateB) return dateA - dateB;
+      return a.id.localeCompare(b.id);
     });
-    
-    stats.totalReceivedFromSupplier += transferAdjustment;
-    
-    let salesBalance = transferAdjustment; // Start balance with transfers not linked to a transaction date
-    const balances = supplierTransactionsAsc.map(t => {
-      salesBalance += t.amountReceivedFromSupplier - t.totalSellingPrice;
-      return { ...t, salesRunningBalance: salesBalance };
-    }).sort((a, b) => b.date.getTime() - a.date.getTime());
 
-    return { transactionsWithBalances: balances, supplierStats: stats };
-  }, [transactions, supplierName, balanceTransfers]);
+    let runningBalance = 0;
+    const eventBalances = new Map<string, number>();
 
-  const finalSalesBalance = supplierStats.totalReceivedFromSupplier - supplierStats.totalSales;
+    combinedEvents.forEach(event => {
+      if (event.type === 'transaction') {
+        runningBalance += event.payload.amountReceivedFromSupplier - event.payload.totalSellingPrice;
+      } else if (event.type === 'transfer') {
+        const amount = event.payload.toSupplier === supplierName ? event.payload.amount : -event.payload.amount;
+        runningBalance += amount;
+      } else if (event.type === 'payment') {
+        runningBalance -= event.payload.amount; // Payments to supplier decrease their balance with us
+      }
+      eventBalances.set(event.id, runningBalance);
+    });
+
+    // Map running balances back to the transactions to be displayed in the table
+    const transactionsWithBalances = supplierTransactions
+      .map(t => ({
+        ...t,
+        salesRunningBalance: eventBalances.get(t.id) || 0
+      }))
+      .sort((a, b) => {
+          const dateA = a.date.getTime();
+          const dateB = b.date.getTime();
+          if (dateA !== dateB) return b.date.getTime() - a.date.getTime();
+          return b.id.localeCompare(a.id);
+      });
+      
+    const totalSales = supplierTransactions.reduce((acc, t) => acc + t.totalSellingPrice, 0);
+    const totalReceivedFromSupplierAfterAdjustments = runningBalance + totalSales;
+
+    const supplierStats = {
+      totalSales,
+      totalReceivedFromSupplier: totalReceivedFromSupplierAfterAdjustments,
+    };
+
+    return { transactionsWithBalances, finalSalesBalance: runningBalance, supplierStats };
+  }, [transactions, balanceTransfers, supplierPayments, supplierName]);
+
 
   if (!supplierName) {
     return (
@@ -98,7 +141,7 @@ export default function SimplifiedSalesReport() {
           <h2 className="text-lg font-bold mb-4 border-b pb-2">ملخص رصيد المبيعات</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
               <div className="p-2 sm:p-4 border rounded-lg">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم (بعد التحويلات)</h3>
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم (بعد التحويلات والدفعات)</h3>
                   <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">
