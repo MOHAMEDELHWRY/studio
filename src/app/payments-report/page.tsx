@@ -64,7 +64,7 @@ const paymentSchema = z.object({
   amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
   supplierName: z.string().min(1, "يجب اختيار المورد."),
   method: z.enum(['نقدي', 'بنكي'], { required_error: "طريقة التحويل مطلوبة." }),
-  classification: z.enum(['دفعة من رصيد المبيعات', 'سحب أرباح للمورد', 'سداد للمصنع عن المورد', 'استعادة مبلغ كتسوية'], { required_error: "يجب تحديد تصنيف الدفعة." }),
+  classification: z.enum(['دفعة من رصيد المبيعات', 'سحب أرباح للمورد', 'سداد للمصنع عن المورد', 'استعادة مبلغ كتسوية', 'سحب مبلغ كتسوية'], { required_error: "يجب تحديد تصنيف الدفعة." }),
   sourceBank: z.string().optional(),
   destinationBank: z.string().optional(),
   reason: z.string().trim().min(1, "يجب كتابة سبب الصرف."),
@@ -97,6 +97,7 @@ export default function PaymentsReportPage() {
       responsiblePerson: "",
       sourceBank: "",
       destinationBank: "",
+      document: undefined,
     },
   });
   const paymentMethodWatcher = form.watch('method');
@@ -110,6 +111,7 @@ export default function PaymentsReportPage() {
           date: new Date(payment.date),
           sourceBank: payment.sourceBank ?? "",
           destinationBank: payment.destinationBank ?? "",
+          document: undefined,
       });
     } else {
       form.reset({
@@ -122,6 +124,7 @@ export default function PaymentsReportPage() {
         responsiblePerson: "",
         sourceBank: "",
         destinationBank: "",
+        document: undefined,
       });
     }
     setIsDialogOpen(true);
@@ -217,7 +220,7 @@ export default function PaymentsReportPage() {
                     <FormField control={form.control} name="responsiblePerson" render={({ field }) => (<FormItem><FormLabel>القائم بالتحويل</FormLabel><FormControl><Input placeholder="اسم المسؤول" {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
                   
-                  <FormField control={form.control} name="classification" render={({ field }) => (<FormItem><FormLabel>تصنيف الدفعة</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر تصنيف الدفعة..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="دفعة من رصيد المبيعات">دفعة من رصيد المبيعات</SelectItem><SelectItem value="سحب أرباح للمورد">سحب أرباح للمورد</SelectItem><SelectItem value="سداد للمصنع عن المورد">سداد للمصنع عن المورد</SelectItem><SelectItem value="استعادة مبلغ كتسوية">استعادة مبلغ كتسوية</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="classification" render={({ field }) => (<FormItem><FormLabel>تصنيف الدفعة</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر تصنيف الدفعة..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="دفعة من رصيد المبيعات">دفعة من رصيد المبيعات</SelectItem><SelectItem value="سحب أرباح للمورد">سحب أرباح للمورد</SelectItem><SelectItem value="سداد للمصنع عن المورد">سداد للمصنع عن المورد</SelectItem><SelectItem value="استعادة مبلغ كتسوية">استعادة مبلغ كتسوية (رصيد دائن)</SelectItem><SelectItem value="سحب مبلغ كتسوية">سحب مبلغ كتسوية (رصيد مدين)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
 
                   <FormField control={form.control} name="method" render={({ field }) => (<FormItem className="space-y-3"><FormLabel>طريقة التحويل</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="نقدي" /></FormControl><FormLabel className="font-normal">نقدي</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="بنكي" /></FormControl><FormLabel className="font-normal">بنكي</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />
 

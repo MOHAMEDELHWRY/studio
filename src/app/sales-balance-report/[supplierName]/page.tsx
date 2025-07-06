@@ -113,17 +113,17 @@ export default function SimplifiedSalesReport() {
             });
         } else if (event.type === 'payment') {
             const p = event.payload;
-            const isRefund = p.classification === 'استعادة مبلغ كتسوية';
+            const isCredit = p.classification === 'استعادة مبلغ كتسوية';
             const amount = p.amount;
 
-            balance += isRefund ? amount : -amount; // Refunds are credit, payments are debit
+            balance += isCredit ? amount : -amount;
             
             rows.push({
                 id: p.id,
                 date: p.date,
-                description: `${isRefund ? 'استعادة مبلغ كتسوية' : 'دفعة للمورد'} - ${p.reason}`,
-                credit: isRefund ? amount : 0,
-                debit: !isRefund ? amount : 0,
+                description: `${p.classification} - ${p.reason}`,
+                credit: isCredit ? amount : 0,
+                debit: !isCredit ? amount : 0,
                 balance: balance,
             });
         }

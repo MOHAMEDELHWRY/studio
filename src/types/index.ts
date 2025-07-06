@@ -46,7 +46,7 @@ export type SupplierPayment = {
   amount: number;
   supplierName: string;
   method: 'نقدي' | 'بنكي';
-  classification: 'دفعة من رصيد المبيعات' | 'سحب أرباح للمورد' | 'سداد للمصنع عن المورد' | 'استعادة مبلغ كتسوية';
+  classification: 'دفعة من رصيد المبيعات' | 'سحب أرباح للمورد' | 'سداد للمصنع عن المورد' | 'استعادة مبلغ كتسوية' | 'سحب مبلغ كتسوية';
   sourceBank?: string;
   destinationBank?: string;
   reason: string;
