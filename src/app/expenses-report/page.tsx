@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -64,12 +65,13 @@ const expenseSchema = z.object({
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 export default function ExpensesReportPage() {
-  const { transactions, expenses, updateExpense, deleteExpense } = useTransactions();
+  const { transactions, expenses, addExpense, updateExpense, deleteExpense } = useTransactions();
   const { toast } = useToast();
 
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isExpenseDatePopoverOpen, setIsExpenseDatePopoverOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const supplierNames = useMemo(() => {
     return Array.from(new Set(transactions.map(t => t.supplierName))).sort();
@@ -113,12 +115,24 @@ export default function ExpensesReportPage() {
   };
 
   const onSubmitExpense = async (values: ExpenseFormValues) => {
-    if (editingExpense) {
-      await updateExpense({ ...editingExpense, ...values });
-      toast({ title: "نجاح", description: "تم تعديل المصروف بنجاح." });
+    setIsSubmitting(true);
+    try {
+      if (editingExpense) {
+        await updateExpense({ ...editingExpense, ...values });
+        toast({ title: "نجاح", description: "تم تعديل المصروف بنجاح." });
+      } else {
+        await addExpense(values);
+        toast({ title: "نجاح", description: "تمت إضافة المصروف بنجاح." });
+      }
+      expenseForm.reset();
+      setIsExpenseDialogOpen(false);
+      setEditingExpense(null);
+    } catch(error) {
+        console.error("Failed to submit expense:", error);
+        toast({ title: "خطأ", description: "فشل حفظ المصروف.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
     }
-    expenseForm.reset();
-    setIsExpenseDialogOpen(false);
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
@@ -277,7 +291,9 @@ export default function ExpensesReportPage() {
                      <DialogClose asChild>
                       <Button type="button" variant="secondary">إلغاء</Button>
                     </DialogClose>
-                    <Button type="submit">حفظ التعديلات</Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? 'جاري الحفظ...' : (editingExpense ? 'حفظ التعديلات' : 'إضافة مصروف')}
+                    </Button>
                   </DialogFooter>
                 </form>
               </Form>

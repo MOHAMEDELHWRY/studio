@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -119,6 +120,8 @@ export default function AccountingDashboard() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExpenseSubmitting, setIsExpenseSubmitting] = useState(false);
   
   // Popover states
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
@@ -195,6 +198,7 @@ export default function AccountingDashboard() {
   };
 
   const onSubmit = async (values: TransactionFormValues) => {
+    setIsSubmitting(true);
     try {
         const totalPurchasePrice = (values.quantity || 0) * (values.purchasePrice || 0);
         const totalSellingPrice = (values.sellingPrice || 0) > 0 ? (values.quantity || 0) * (values.sellingPrice || 0) : 0;
@@ -218,19 +222,29 @@ export default function AccountingDashboard() {
     } catch (error) {
         console.error("Error submitting form", error)
         toast({ title: "خطأ في الإدخال", description: "حدث خطأ أثناء حفظ العملية.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
     }
   };
   
   const onSubmitExpense = async (values: ExpenseFormValues) => {
-    if (editingExpense) {
-      await updateExpense({ ...editingExpense, ...values });
-      toast({ title: "نجاح", description: "تم تعديل المصروف بنجاح." });
-    } else {
-      await addExpense(values);
-      toast({ title: "نجاح", description: "تمت إضافة المصروف بنجاح." });
+    setIsExpenseSubmitting(true);
+    try {
+      if (editingExpense) {
+        await updateExpense({ ...editingExpense, ...values });
+        toast({ title: "نجاح", description: "تم تعديل المصروف بنجاح." });
+      } else {
+        await addExpense(values);
+        toast({ title: "نجاح", description: "تمت إضافة المصروف بنجاح." });
+      }
+      expenseForm.reset();
+      setIsExpenseDialogOpen(false);
+    } catch(error) {
+      console.error("Error submitting expense: ", error);
+      toast({ title: "خطأ", description: "لم نتمكن من حفظ المصروف.", variant: "destructive" });
+    } finally {
+      setIsExpenseSubmitting(false);
     }
-    expenseForm.reset();
-    setIsExpenseDialogOpen(false);
   };
   
   const handleDeleteTransaction = async (transactionId: string) => await deleteTransaction(transactionId);
@@ -473,7 +487,7 @@ export default function AccountingDashboard() {
                   <DialogFooter className="pt-4">
                     {editingTransaction && (<AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" className="mr-auto"><Trash2 className="ml-2 h-4 w-4" />حذف</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle><AlertDialogDescription>هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف العملية بشكل دائم.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={async () => { if (editingTransaction) { await handleDeleteTransaction(editingTransaction.id); setIsDialogOpen(false); setEditingTransaction(null); } }}>متابعة</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>)}
                     <DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose>
-                    <Button type="submit">{editingTransaction ? 'حفظ التعديلات' : 'حفظ العملية'}</Button>
+                    <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'جاري الحفظ...' : (editingTransaction ? 'حفظ التعديلات' : 'حفظ العملية')}</Button>
                   </DialogFooter>
                 </form>
               </Form>
@@ -500,7 +514,10 @@ export default function AccountingDashboard() {
                   <FormField control={expenseForm.control} name="amount" render={({ field }) => (
                     <FormItem><FormLabel>المبلغ</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <DialogFooter><Button type="submit">حفظ المصروف</Button><DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose></DialogFooter>
+                  <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose>
+                    <Button type="submit" disabled={isExpenseSubmitting}>{isExpenseSubmitting ? 'جاري الحفظ...' : (editingExpense ? 'حفظ التعديلات' : 'حفظ المصروف')}</Button>
+                  </DialogFooter>
                 </form>
               </Form>
             </DialogContent>
