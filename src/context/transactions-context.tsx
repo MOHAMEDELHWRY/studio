@@ -21,7 +21,8 @@ import {
   ref as storageRef, 
   uploadBytes, 
   getDownloadURL,
-  deleteObject
+  deleteObject,
+  type StorageReference
 } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './auth-context';
@@ -343,34 +344,36 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id' | 'documentUrl'>, documentFile?: File) => {
     if (!currentUser) throw new Error("User not authenticated");
     
-    const paymentsCollectionRef = collection(db, 'users', currentUser.uid, 'supplierPayments');
-    const newPaymentRef = doc(paymentsCollectionRef); // Generate new doc ref with ID
-    
+    const newPaymentRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
+    let fileRef: StorageReference | null = null;
+  
     try {
       let documentUrl = '';
-
       if (documentFile) {
-        const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${newPaymentRef.id}/${documentFile.name}`);
+        fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${newPaymentRef.id}/${documentFile.name}`);
         await uploadBytes(fileRef, documentFile);
         documentUrl = await getDownloadURL(fileRef);
       }
-
+  
       const newPaymentData = {
         ...payment,
         date: payment.date.toISOString(),
-        documentUrl: documentUrl,
+        documentUrl,
       };
-
+  
       await setDoc(newPaymentRef, newPaymentData);
-      
+  
       const finalPayment: SupplierPayment = { ...payment, id: newPaymentRef.id, documentUrl };
       setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
-
     } catch (error) {
       console.error("Error adding supplier payment: ", error);
-      // If we are here, it means the process failed. We don't need to delete the doc because setDoc would have failed.
-      // And if file upload failed, the doc was never created.
-      // So just re-throw.
+      if (fileRef) {
+        try {
+          await deleteObject(fileRef);
+        } catch (cleanupError) {
+          console.error("Failed to cleanup orphaned file after failed DB write.", cleanupError);
+        }
+      }
       throw error;
     }
   };
@@ -380,46 +383,52 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     const { id, ...dataToUpdate } = updatedPayment;
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', id);
 
+    let newFileRef: StorageReference | null = null;
+    let newDocumentUrl: string | null = null;
+
     try {
         const docSnap = await getDoc(paymentDocRef);
         if (!docSnap.exists()) {
-          throw new Error("Payment document to update not found.");
+            throw new Error("Payment document to update not found.");
         }
         const oldDocumentUrl = (docSnap.data() as SupplierPayment).documentUrl;
         
-        let newDocumentUrl = oldDocumentUrl;
+        let finalDocumentUrl = oldDocumentUrl;
 
         if (documentFile) {
-            const newFileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${id}/${documentFile.name}`);
+            newFileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${id}/${documentFile.name}`);
             await uploadBytes(newFileRef, documentFile);
             newDocumentUrl = await getDownloadURL(newFileRef);
+            finalDocumentUrl = newDocumentUrl;
         }
         
-        const docData = {
-            ...dataToUpdate,
-            date: updatedPayment.date.toISOString(),
-            documentUrl: newDocumentUrl,
-        };
-
+        const docData = { ...dataToUpdate, date: updatedPayment.date.toISOString(), documentUrl: finalDocumentUrl };
         await updateDoc(paymentDocRef, docData as any);
         
-        if (documentFile && oldDocumentUrl && oldDocumentUrl !== newDocumentUrl) {
+        if (newDocumentUrl && oldDocumentUrl && oldDocumentUrl !== newDocumentUrl) {
             try {
                 const oldFileRef = storageRef(storage, oldDocumentUrl);
                 await deleteObject(oldFileRef);
             } catch (storageError: any) {
                 if (storageError.code !== 'storage/object-not-found') {
-                    console.error("Could not delete old file, but update was successful.", storageError);
+                    console.warn("Could not delete old file, but update was successful.", storageError);
                 }
             }
         }
         
-        const finalUpdatedPayment: SupplierPayment = { ...updatedPayment, documentUrl: newDocumentUrl };
+        const finalUpdatedPayment: SupplierPayment = { ...updatedPayment, documentUrl: finalDocumentUrl };
         setSupplierPayments(prev =>
             prev.map(p => (p.id === id ? finalUpdatedPayment : p)).sort((a, b) => b.date.getTime() - a.date.getTime())
         );
     } catch (error) {
         console.error("Error updating supplier payment: ", error);
+        if (newFileRef) {
+            try {
+                await deleteObject(newFileRef);
+            } catch (cleanupError) {
+                console.error("Failed to cleanup orphaned file after failed DB update.", cleanupError);
+            }
+        }
         throw error;
     }
   };
