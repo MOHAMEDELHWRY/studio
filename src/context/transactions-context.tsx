@@ -150,7 +150,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
-    if (!currentUser) return;
+    if (!currentUser) throw new Error("User not authenticated");
     try {
       const transactionsCollectionRef = collection(db, 'users', currentUser.uid, 'transactions');
       const docData = {
@@ -163,12 +163,12 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       setTransactions(prev => [{ ...transaction, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
     } catch (error) {
       console.error("Error adding transaction: ", error);
-      toast({ title: "خطأ", description: "لم نتمكن من إضافة العملية.", variant: "destructive" });
+      throw error;
     }
   };
 
   const updateTransaction = async (updatedTransaction: Transaction) => {
-    if (!currentUser) return;
+    if (!currentUser) throw new Error("User not authenticated");
      try {
       const { id, ...dataToUpdate } = updatedTransaction;
       const transactionDoc = doc(db, 'users', currentUser.uid, 'transactions', id);
@@ -185,7 +185,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       );
     } catch (error) {
       console.error("Error updating transaction: ", error);
-      toast({ title: "خطأ", description: "لم نتمكن من تعديل العملية.", variant: "destructive" });
+      throw error;
     }
   };
 
@@ -233,7 +233,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   };
   
   const addExpense = async (expense: Omit<Expense, 'id'>) => {
-    if (!currentUser) return;
+    if (!currentUser) throw new Error("User not authenticated");
     try {
       const expensesCollectionRef = collection(db, 'users', currentUser.uid, 'expenses');
       const docData = {
@@ -244,12 +244,12 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       setExpenses(prev => [{...expense, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
     } catch (error) {
       console.error("Error adding expense: ", error);
-      toast({ title: "خطأ", description: "لم نتمكن من إضافة المصروف.", variant: "destructive" });
+      throw error;
     }
   };
 
   const updateExpense = async (updatedExpense: Expense) => {
-    if (!currentUser) return;
+    if (!currentUser) throw new Error("User not authenticated");
      try {
       const { id, ...dataToUpdate } = updatedExpense;
       const expenseDoc = doc(db, 'users', currentUser.uid, 'expenses', id);
@@ -264,7 +264,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       );
     } catch (error) {
       console.error("Error updating expense: ", error);
-      toast({ title: "خطأ", description: "لم نتمكن من تعديل المصروف.", variant: "destructive" });
+      throw error;
     }
   };
 
@@ -286,7 +286,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   };
 
   const addBalanceTransfer = async (transfer: Omit<BalanceTransfer, 'id'>) => {
-    if (!currentUser) return;
+    if (!currentUser) throw new Error("User not authenticated");
     try {
       const transfersCollectionRef = collection(db, 'users', currentUser.uid, 'balanceTransfers');
       const docData = {
@@ -297,12 +297,12 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       setBalanceTransfers(prev => [{ ...transfer, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
     } catch (error) {
       console.error("Error adding balance transfer: ", error);
-      toast({ title: "خطأ", description: "لم نتمكن من إضافة عملية التحويل.", variant: "destructive" });
+      throw error;
     }
   };
 
   const updateBalanceTransfer = async (updatedTransfer: BalanceTransfer) => {
-    if (!currentUser) return;
+    if (!currentUser) throw new Error("User not authenticated");
     try {
       const { id, ...dataToUpdate } = updatedTransfer;
       const transferDoc = doc(db, 'users', currentUser.uid, 'balanceTransfers', id);
@@ -317,7 +317,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       );
     } catch (error) {
       console.error("Error updating balance transfer: ", error);
-      toast({ title: "خطأ", description: "لم نتمكن من تعديل عملية التحويل.", variant: "destructive" });
+      throw error;
     }
   };
 
@@ -339,59 +339,53 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   };
 
   const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id'>, documentFile?: File) => {
-    if (!currentUser) return;
+    if (!currentUser) throw new Error("User not authenticated");
     const paymentsCollectionRef = collection(db, 'users', currentUser.uid, 'supplierPayments');
     
-    // Create doc without URL first
-    const docData = { ...payment, date: payment.date.toISOString(), documentUrl: '' };
-    const docRef = await addDoc(paymentsCollectionRef, docData);
-
-    let finalPayment: SupplierPayment = { ...payment, id: docRef.id };
+    const docRef = await addDoc(paymentsCollectionRef, { ...payment, date: payment.date.toISOString(), documentUrl: '' });
 
     try {
+      let documentUrl = '';
       if (documentFile) {
         const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${docRef.id}/${documentFile.name}`);
         await uploadBytes(fileRef, documentFile);
-        const downloadURL = await getDownloadURL(fileRef);
+        documentUrl = await getDownloadURL(fileRef);
         
-        // Update doc with URL
-        await updateDoc(docRef, { documentUrl: downloadURL });
-        finalPayment.documentUrl = downloadURL;
+        await updateDoc(docRef, { documentUrl });
       }
       
+      const finalPayment: SupplierPayment = { ...payment, id: docRef.id, documentUrl };
       setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
     } catch (error) {
-      console.error("Error adding supplier payment: ", error);
-      toast({ title: "خطأ", description: "لم نتمكن من تسجيل الدفعة.", variant: "destructive" });
-      // Clean up the created doc if upload fails
-      await deleteDoc(docRef);
+      console.error("Error adding supplier payment, cleaning up: ", error);
+      await deleteDoc(docRef); // Clean up the created doc if subsequent steps fail
+      throw error;
     }
   };
 
   const updateSupplierPayment = async (updatedPayment: SupplierPayment, documentFile?: File) => {
-    if (!currentUser) return;
+    if (!currentUser) throw new Error("User not authenticated");
     const { id, ...dataToUpdate } = updatedPayment;
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', id);
 
     try {
         let newDocumentUrl = dataToUpdate.documentUrl;
         if (documentFile) {
-            const oldDocSnap = await getDoc(paymentDocRef);
-            const oldData = oldDocSnap.data() as SupplierPayment;
-            
-            // Upload new file first
             const newFileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${id}/${documentFile.name}`);
             await uploadBytes(newFileRef, documentFile);
             newDocumentUrl = await getDownloadURL(newFileRef);
             
-            // If upload is successful and there was an old file, delete it
-            if (oldData.documentUrl && oldData.documentUrl !== newDocumentUrl) {
-                try {
-                    const oldFileRef = storageRef(storage, oldData.documentUrl);
-                    await deleteObject(oldFileRef);
-                } catch (storageError) {
-                    console.error("Could not delete old file from storage.", storageError);
-                }
+            const oldDocSnap = await getDoc(paymentDocRef);
+            if (oldDocSnap.exists()) {
+              const oldData = oldDocSnap.data() as SupplierPayment;
+              if (oldData.documentUrl && oldData.documentUrl !== newDocumentUrl) {
+                  try {
+                      const oldFileRef = storageRef(storage, oldData.documentUrl);
+                      await deleteObject(oldFileRef);
+                  } catch (storageError) {
+                      console.error("Could not delete old file from storage, but continuing update.", storageError);
+                  }
+              }
             }
         }
 
@@ -406,10 +400,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         setSupplierPayments(prev =>
             prev.map(p => (p.id === id ? finalUpdatedPayment : p)).sort((a, b) => b.date.getTime() - a.date.getTime())
         );
-        toast({ title: "نجاح", description: "تم تعديل الدفعة بنجاح." });
     } catch (error) {
         console.error("Error updating supplier payment: ", error);
-        toast({ title: "خطأ", description: "لم نتمكن من تعديل الدفعة.", variant: "destructive" });
+        throw error;
     }
   };
   

@@ -78,6 +78,7 @@ export default function TransfersReportPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTransfer, setEditingTransfer] = useState<BalanceTransfer | null>(null);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const supplierNames = useMemo(() => {
     return Array.from(new Set(transactions.map(t => t.supplierName))).sort();
@@ -125,15 +126,24 @@ export default function TransfersReportPage() {
   };
 
   const onSubmit = async (values: TransferFormValues) => {
-    if (editingTransfer) {
-      await updateBalanceTransfer({ ...editingTransfer, ...values });
-      toast({ title: "نجاح", description: "تم تعديل التحويل بنجاح." });
-    } else {
-      await addBalanceTransfer(values);
-      toast({ title: "نجاح", description: "تم تسجيل التحويل بنجاح." });
+    setIsSubmitting(true);
+    try {
+      if (editingTransfer) {
+        await updateBalanceTransfer({ ...editingTransfer, ...values });
+        toast({ title: "نجاح", description: "تم تعديل التحويل بنجاح." });
+      } else {
+        await addBalanceTransfer(values);
+        toast({ title: "نجاح", description: "تم تسجيل التحويل بنجاح." });
+      }
+      form.reset();
+      setIsDialogOpen(false);
+      setEditingTransfer(null);
+    } catch (error) {
+      console.error("Error submitting transfer:", error);
+      toast({ title: "خطأ", description: "فشل حفظ التحويل. يرجى المحاولة مرة أخرى.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
     }
-    form.reset();
-    setIsDialogOpen(false);
   };
 
   const handleDelete = async (transferId: string) => {
@@ -217,7 +227,9 @@ export default function TransfersReportPage() {
               <FormField control={form.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للتحويل..." {...field} /></FormControl><FormMessage /></FormItem>)} />
               <DialogFooter className="pt-4">
                  <DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose>
-                 <Button type="submit">{editingTransfer ? 'حفظ التعديلات' : 'حفظ التحويل'}</Button>
+                 <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'جاري الحفظ...' : (editingTransfer ? 'حفظ التعديلات' : 'حفظ التحويل')}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
