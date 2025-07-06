@@ -344,31 +344,41 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     if (!currentUser) throw new Error("User not authenticated");
     
     try {
-      // 1. Create the document with a placeholder URL first.
-      const docRef = await addDoc(collection(db, 'users', currentUser.uid, 'supplierPayments'), {
-        ...payment,
-        date: payment.date.toISOString(),
-        documentUrl: '', // Placeholder
-      });
+      const paymentsCollectionRef = collection(db, 'users', currentUser.uid, 'supplierPayments');
 
-      let documentUrl = '';
       if (documentFile) {
-        // 2. If there's a file, upload it using the ID from the created document.
-        const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${docRef.id}/${documentFile.name}`);
+        // Path with file upload: Generate ID, upload file, then create doc
+        const newPaymentRef = doc(paymentsCollectionRef);
+        const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${newPaymentRef.id}/${documentFile.name}`);
+        
         await uploadBytes(fileRef, documentFile);
-        documentUrl = await getDownloadURL(fileRef);
+        const documentUrl = await getDownloadURL(fileRef);
 
-        // 3. Update the document with the real file URL.
-        await updateDoc(docRef, { documentUrl: documentUrl });
+        const newPaymentData = {
+            ...payment,
+            date: payment.date.toISOString(),
+            documentUrl: documentUrl,
+        };
+        await setDoc(newPaymentRef, newPaymentData);
+        
+        const finalPayment: SupplierPayment = { ...payment, id: newPaymentRef.id, documentUrl };
+        setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
+
+      } else {
+        // Path without file upload
+        const docRef = await addDoc(paymentsCollectionRef, {
+          ...payment,
+          date: payment.date.toISOString(),
+          documentUrl: '', 
+        });
+
+        const finalPayment: SupplierPayment = { ...payment, id: docRef.id, documentUrl: '' };
+        setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
       }
-
-      // 4. Update the local React state with the complete data.
-      const finalPayment: SupplierPayment = { ...payment, id: docRef.id, documentUrl };
-      setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
 
     } catch (error) {
       console.error("Error adding supplier payment: ", error);
-      throw error;
+      throw error; // Re-throw to be caught by the UI component
     }
   };
 
@@ -378,13 +388,11 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', id);
 
     try {
-        const docSnap = await getDoc(paymentDocRef);
-        const oldDocumentUrl = docSnap.exists() ? (docSnap.data() as SupplierPayment).documentUrl : undefined;
+        let newDocumentUrl = updatedPayment.documentUrl; // Start with the existing URL
 
-        let newDocumentUrl = oldDocumentUrl;
-
-        // If a new file is provided, upload it and get the new URL.
+        // If a new file is provided, it replaces the old one.
         if (documentFile) {
+            // Upload the new file first.
             const newFileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${id}/${documentFile.name}`);
             await uploadBytes(newFileRef, documentFile);
             newDocumentUrl = await getDownloadURL(newFileRef);
@@ -396,20 +404,23 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
             documentUrl: newDocumentUrl,
         };
 
+        // Update the document in Firestore
         await updateDoc(paymentDocRef, docData as any);
-
-        // If a new file was uploaded AND there was an old file AND they are different, delete the old one.
-        if (documentFile && oldDocumentUrl && oldDocumentUrl !== newDocumentUrl) {
+        
+        // If a new file was uploaded AND there was a different old file, delete the old one from Storage.
+        if (documentFile && updatedPayment.documentUrl && updatedPayment.documentUrl !== newDocumentUrl) {
             try {
-                const oldFileRef = storageRef(storage, oldDocumentUrl);
+                const oldFileRef = storageRef(storage, updatedPayment.documentUrl);
                 await deleteObject(oldFileRef);
             } catch (storageError: any) {
+                // If the old file doesn't exist, it's not a critical error.
                 if (storageError.code !== 'storage/object-not-found') {
                     console.error("Could not delete old file, but update was successful.", storageError);
                 }
             }
         }
         
+        // Update local state
         const finalUpdatedPayment: SupplierPayment = { ...updatedPayment, documentUrl: newDocumentUrl };
         setSupplierPayments(prev =>
             prev.map(p => (p.id === id ? finalUpdatedPayment : p)).sort((a, b) => b.date.getTime() - a.date.getTime())
