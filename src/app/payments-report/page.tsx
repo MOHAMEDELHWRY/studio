@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -69,7 +70,7 @@ const paymentSchema = z.object({
   destinationBank: z.string().optional(),
   reason: z.string().trim().min(1, "يجب كتابة سبب الصرف."),
   responsiblePerson: z.string().trim().min(1, "يجب تحديد القائم بالتحويل."),
-  document: z.instanceof(FileList).optional(),
+  document: z.instanceof(FileList).optional().nullable(),
 });
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
@@ -98,7 +99,7 @@ export default function PaymentsReportPage() {
       responsiblePerson: "",
       sourceBank: "",
       destinationBank: "",
-      document: undefined,
+      document: null,
     },
   });
   const paymentMethodWatcher = form.watch('method');
@@ -112,7 +113,7 @@ export default function PaymentsReportPage() {
           date: new Date(payment.date),
           sourceBank: payment.sourceBank ?? "",
           destinationBank: payment.destinationBank ?? "",
-          document: undefined,
+          document: null,
       });
     } else {
       form.reset({
@@ -125,7 +126,7 @@ export default function PaymentsReportPage() {
         responsiblePerson: "",
         sourceBank: "",
         destinationBank: "",
-        document: undefined,
+        document: null,
       });
     }
     setIsDialogOpen(true);
@@ -149,7 +150,7 @@ export default function PaymentsReportPage() {
             await updateSupplierPayment(updatedPaymentData, documentFile);
             toast({ title: "نجاح", description: "تم تعديل الدفعة بنجاح." });
         } else {
-            const newPaymentData: Omit<SupplierPayment, 'id'> = { ...restOfValues, documentUrl: '' };
+            const newPaymentData: Omit<SupplierPayment, 'id' | 'documentUrl'> = { ...restOfValues };
             await addSupplierPayment(newPaymentData, documentFile);
             toast({ title: "نجاح", description: "تم تسجيل الدفعة بنجاح." });
         }
@@ -242,16 +243,19 @@ export default function PaymentsReportPage() {
                   <FormField
                     control={form.control}
                     name="document"
-                    render={({ field: { value, onChange, ...fieldProps } }) => (
+                    render={({ field: { onChange, onBlur, name, ref } }) => (
                       <FormItem>
                         <FormLabel>رفع مستند التحويل (اختياري)</FormLabel>
                         <FormControl>
                           <Input
                             type="file"
-                            onChange={(event) =>
-                              onChange(event.target.files && event.target.files.length > 0 ? event.target.files : undefined)
-                            }
-                            {...fieldProps}
+                            onChange={(event) => {
+                              const files = event.target.files;
+                              onChange(files && files.length > 0 ? files : null);
+                            }}
+                            onBlur={onBlur}
+                            name={name}
+                            ref={ref}
                           />
                         </FormControl>
                         <FormMessage />
