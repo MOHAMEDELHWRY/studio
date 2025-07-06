@@ -41,8 +41,8 @@ export default function ShareableSupplierReport() {
     // --- 1. Filter data for the current supplier ---
     const supplierTransactions = transactions.filter(t => t.supplierName === supplierName);
     const relatedTransfers = balanceTransfers.filter(t => t.fromSupplier === supplierName || t.toSupplier === supplierName);
-    const relatedSalesPayments = supplierPayments.filter(p => p.supplierName === supplierName && p.deductFrom === 'رصيد المبيعات');
-    const relatedFactoryPayments = supplierPayments.filter(p => p.supplierName === supplierName && p.deductFrom === 'رصيد المصنع');
+    const relatedSalesPayments = supplierPayments.filter(p => p.supplierName === supplierName && p.classification !== 'سداد للمصنع عن المورد');
+    const relatedFactoryPayments = supplierPayments.filter(p => p.supplierName === supplierName && p.classification === 'سداد للمصنع عن المورد');
 
     // --- 2. Calculate static stats (like tons and totals for cards) ---
     const stats = { 

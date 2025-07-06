@@ -64,7 +64,7 @@ const paymentSchema = z.object({
   amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
   supplierName: z.string().min(1, "يجب اختيار المورد."),
   method: z.enum(['نقدي', 'بنكي'], { required_error: "طريقة التحويل مطلوبة." }),
-  deductFrom: z.enum(['رصيد المبيعات', 'رصيد المصنع'], { required_error: "يجب تحديد من أي رصيد يتم الخصم." }),
+  classification: z.enum(['دفعة من رصيد المبيعات', 'سحب أرباح للمورد', 'سداد للمصنع عن المورد'], { required_error: "يجب تحديد تصنيف الدفعة." }),
   sourceBank: z.string().optional(),
   destinationBank: z.string().optional(),
   reason: z.string().trim().min(1, "يجب كتابة سبب الصرف."),
@@ -92,7 +92,7 @@ export default function PaymentsReportPage() {
       amount: 0,
       supplierName: "",
       method: 'نقدي',
-      deductFrom: 'رصيد المبيعات',
+      classification: 'دفعة من رصيد المبيعات',
       reason: "",
       responsiblePerson: "",
       sourceBank: "",
@@ -117,7 +117,7 @@ export default function PaymentsReportPage() {
         amount: 0,
         supplierName: "",
         method: 'نقدي',
-        deductFrom: 'رصيد المبيعات',
+        classification: 'دفعة من رصيد المبيعات',
         reason: "",
         responsiblePerson: "",
         sourceBank: "",
@@ -216,11 +216,13 @@ export default function PaymentsReportPage() {
                     <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>المبلغ المصروف</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="responsiblePerson" render={({ field }) => (<FormItem><FormLabel>القائم بالتحويل</FormLabel><FormControl><Input placeholder="اسم المسؤول" {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="method" render={({ field }) => (<FormItem className="space-y-3"><FormLabel>طريقة التحويل</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="نقدي" /></FormControl><FormLabel className="font-normal">نقدي</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="بنكي" /></FormControl><FormLabel className="font-normal">بنكي</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="deductFrom" render={({ field }) => (<FormItem className="space-y-3"><FormLabel>خصم الدفعة من</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="رصيد المبيعات" /></FormControl><FormLabel className="font-normal">رصيد المبيعات</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="رصيد المصنع" /></FormControl><FormLabel className="font-normal">رصيد المصنع</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />
-                  </div>
+                  
+                  <FormField control={form.control} name="classification" render={({ field }) => (<FormItem><FormLabel>تصنيف الدفعة</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر تصنيف الدفعة..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="دفعة من رصيد المبيعات">دفعة من رصيد المبيعات</SelectItem><SelectItem value="سحب أرباح للمورد">سحب أرباح للمورد</SelectItem><SelectItem value="سداد للمصنع عن المورد">سداد للمصنع عن المورد</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+
+                  <FormField control={form.control} name="method" render={({ field }) => (<FormItem className="space-y-3"><FormLabel>طريقة التحويل</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="نقدي" /></FormControl><FormLabel className="font-normal">نقدي</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="بنكي" /></FormControl><FormLabel className="font-normal">بنكي</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />
+
                   {paymentMethodWatcher === 'بنكي' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md"><FormField control={form.control} name="sourceBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول منه</FormLabel><FormControl><Input placeholder="حساب الشركة" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="destinationBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول إليه</FormLabel><FormControl><Input placeholder="بنك المورد" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} /></div>)}
+                  
                   <FormField control={form.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للصرف..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="document" render={({ field: { value, onChange, ...rest } }) => (<FormItem><FormLabel>رفع مستند التحويل (اختياري)</FormLabel><FormControl><Input type="file" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl><FormMessage /></FormItem>)} />
                   {editingPayment?.documentUrl && !paymentDocumentWatcher?.length && (<div className="text-sm"><span className="font-medium">المستند الحالي: </span><a href={editingPayment.documentUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">عرض المستند</a><p className="text-xs text-muted-foreground">للتغيير، قم برفع ملف جديد.</p></div>)}
@@ -237,7 +239,7 @@ export default function PaymentsReportPage() {
         <CardContent>
            <div className="relative w-full overflow-auto">
             <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-              <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المورد</TableHead><TableHead>المبلغ</TableHead><TableHead>الطريقة</TableHead><TableHead>الرصيد المستهدف</TableHead><TableHead>السبب</TableHead><TableHead>المسؤول</TableHead><TableHead>المستند</TableHead><TableHead>إجراءات</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المورد</TableHead><TableHead>المبلغ</TableHead><TableHead>الطريقة</TableHead><TableHead>التصنيف</TableHead><TableHead>السبب</TableHead><TableHead>المسؤول</TableHead><TableHead>المستند</TableHead><TableHead>إجراءات</TableHead></TableRow></TableHeader>
               <TableBody>
                 {sortedPayments.length > 0 ? (
                   sortedPayments.map(p => (
@@ -246,7 +248,7 @@ export default function PaymentsReportPage() {
                       <TableCell className="font-medium">{p.supplierName}</TableCell>
                       <TableCell className="font-bold text-destructive">{p.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                       <TableCell>{p.method}</TableCell>
-                      <TableCell>{p.deductFrom}</TableCell>
+                      <TableCell>{p.classification}</TableCell>
                       <TableCell>{p.reason}</TableCell>
                       <TableCell>{p.responsiblePerson}</TableCell>
                       <TableCell>{p.documentUrl ? (<Button asChild variant="link" className="p-0 h-auto"><a href={p.documentUrl} target="_blank" rel="noopener noreferrer"><FileIcon className="w-4 h-4" /></a></Button>) : ('-')}</TableCell>

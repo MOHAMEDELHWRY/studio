@@ -115,12 +115,23 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         // Fetch supplier payments
         const paymentSnapshot = await getDocs(supplierPaymentsCollectionRef);
         const fetchedPayments = paymentSnapshot.docs.map(doc => {
-          const data = doc.data();
+          const data = doc.data() as any;
+          let classification = data.classification;
+
+          // Backward compatibility for old `deductFrom` field
+          if (!classification && data.deductFrom) {
+            if (data.deductFrom === 'رصيد المصنع') {
+              classification = 'سداد للمصنع عن المورد';
+            } else { // 'رصيد المبيعات' and any other case
+              classification = 'دفعة من رصيد المبيعات';
+            }
+          }
+
           return {
             ...data,
             id: doc.id,
             date: new Date(data.date),
-            deductFrom: data.deductFrom || 'رصيد المبيعات',
+            classification: classification || 'دفعة من رصيد المبيعات', // Default for very old data
           } as SupplierPayment;
         });
         setSupplierPayments(fetchedPayments.sort((a, b) => b.date.getTime() - a.date.getTime()));

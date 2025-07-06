@@ -53,7 +53,7 @@ export default function SimplifiedSalesReport() {
           payload: t
         })),
       ...supplierPayments
-        .filter(p => p.supplierName === supplierName && p.deductFrom === 'رصيد المبيعات')
+        .filter(p => p.supplierName === supplierName && p.classification !== 'سداد للمصنع عن المورد')
         .map(p => ({
           id: p.id,
           date: p.date,

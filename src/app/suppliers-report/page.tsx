@@ -56,9 +56,9 @@ export default function SuppliersReportPage() {
     const factoryPaymentAdjustments = new Map<string, number>();
 
     supplierPayments.forEach(payment => {
-      if (payment.deductFrom === 'رصيد المصنع') {
+      if (payment.classification === 'سداد للمصنع عن المورد') {
         factoryPaymentAdjustments.set(payment.supplierName, (factoryPaymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
-      } else { // Default to sales balance
+      } else { // 'دفعة من رصيد المبيعات' or 'سحب أرباح للمورد'
         salesPaymentAdjustments.set(payment.supplierName, (salesPaymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
       }
     });
