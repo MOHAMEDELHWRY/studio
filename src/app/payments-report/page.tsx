@@ -64,7 +64,7 @@ const paymentSchema = z.object({
   amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
   supplierName: z.string().min(1, "يجب اختيار المورد."),
   method: z.enum(['نقدي', 'بنكي'], { required_error: "طريقة التحويل مطلوبة." }),
-  classification: z.enum(['دفعة من رصيد المبيعات', 'سحب أرباح للمورد', 'سداد للمصنع عن المورد'], { required_error: "يجب تحديد تصنيف الدفعة." }),
+  classification: z.enum(['دفعة من رصيد المبيعات', 'سحب أرباح للمورد', 'سداد للمصنع عن المورد', 'استعادة مبلغ كتسوية'], { required_error: "يجب تحديد تصنيف الدفعة." }),
   sourceBank: z.string().optional(),
   destinationBank: z.string().optional(),
   reason: z.string().trim().min(1, "يجب كتابة سبب الصرف."),
@@ -185,11 +185,11 @@ export default function PaymentsReportPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المبالغ المدفوعة</CardTitle>
+            <CardTitle className="text-sm font-medium">إجمالي المبالغ المسجلة</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">
+            <div className="text-2xl font-bold">
                 {totalAmount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
             </div>
           </CardContent>
@@ -217,7 +217,7 @@ export default function PaymentsReportPage() {
                     <FormField control={form.control} name="responsiblePerson" render={({ field }) => (<FormItem><FormLabel>القائم بالتحويل</FormLabel><FormControl><Input placeholder="اسم المسؤول" {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
                   
-                  <FormField control={form.control} name="classification" render={({ field }) => (<FormItem><FormLabel>تصنيف الدفعة</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر تصنيف الدفعة..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="دفعة من رصيد المبيعات">دفعة من رصيد المبيعات</SelectItem><SelectItem value="سحب أرباح للمورد">سحب أرباح للمورد</SelectItem><SelectItem value="سداد للمصنع عن المورد">سداد للمصنع عن المورد</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="classification" render={({ field }) => (<FormItem><FormLabel>تصنيف الدفعة</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر تصنيف الدفعة..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="دفعة من رصيد المبيعات">دفعة من رصيد المبيعات</SelectItem><SelectItem value="سحب أرباح للمورد">سحب أرباح للمورد</SelectItem><SelectItem value="سداد للمصنع عن المورد">سداد للمصنع عن المورد</SelectItem><SelectItem value="استعادة مبلغ كتسوية">استعادة مبلغ كتسوية</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
 
                   <FormField control={form.control} name="method" render={({ field }) => (<FormItem className="space-y-3"><FormLabel>طريقة التحويل</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="نقدي" /></FormControl><FormLabel className="font-normal">نقدي</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="بنكي" /></FormControl><FormLabel className="font-normal">بنكي</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />
 
@@ -246,7 +246,9 @@ export default function PaymentsReportPage() {
                     <TableRow key={p.id}>
                       <TableCell>{format(p.date, 'dd MMMM yyyy', { locale: ar })}</TableCell>
                       <TableCell className="font-medium">{p.supplierName}</TableCell>
-                      <TableCell className="font-bold text-destructive">{p.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                      <TableCell className={`font-bold ${p.classification === 'استعادة مبلغ كتسوية' ? 'text-success' : 'text-destructive'}`}>
+                        {p.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}
+                      </TableCell>
                       <TableCell>{p.method}</TableCell>
                       <TableCell>{p.classification}</TableCell>
                       <TableCell>{p.reason}</TableCell>

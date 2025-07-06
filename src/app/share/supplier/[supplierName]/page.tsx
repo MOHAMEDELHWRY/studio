@@ -98,7 +98,9 @@ export default function ShareableSupplierReport() {
             const amount = event.payload.toSupplier === supplierName ? event.payload.amount : -event.payload.amount;
             runningSales += amount;
         } else if (event.type === 'sales_payment') {
-            runningSales -= event.payload.amount;
+            const payment = event.payload;
+            const amount = payment.classification === 'استعادة مبلغ كتسوية' ? payment.amount : -payment.amount;
+            runningSales += amount;
         } else if (event.type === 'factory_payment') {
             runningFactory += event.payload.amount;
         }
@@ -189,7 +191,7 @@ export default function ShareableSupplierReport() {
                   <p className="text-base sm:text-xl font-bold text-gray-800">{supplierStats.totalSales.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
                <div className="p-2 sm:p-4 border rounded-lg">
-                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم (بعد الدفعات)</h3>
+                  <h3 className="text-xs sm:text-sm font-medium text-gray-600">إجمالي المستلم (بعد التسويات)</h3>
                   <p className="text-base sm:text-xl font-bold text-green-600">{supplierStats.totalReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</p>
               </div>
               <div className="p-2 sm:p-4 border rounded-lg">

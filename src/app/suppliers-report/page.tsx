@@ -58,6 +58,8 @@ export default function SuppliersReportPage() {
     supplierPayments.forEach(payment => {
       if (payment.classification === 'سداد للمصنع عن المورد') {
         factoryPaymentAdjustments.set(payment.supplierName, (factoryPaymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
+      } else if (payment.classification === 'استعادة مبلغ كتسوية') {
+        salesPaymentAdjustments.set(payment.supplierName, (salesPaymentAdjustments.get(payment.supplierName) || 0) - payment.amount);
       } else { // 'دفعة من رصيد المبيعات' or 'سحب أرباح للمورد'
         salesPaymentAdjustments.set(payment.supplierName, (salesPaymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
       }
@@ -85,8 +87,8 @@ export default function SuppliersReportPage() {
       const adjustedTotalPaidToFactory = totalPaidToFactory + factoryPaymentAdj;
 
       const finalSalesBalance = adjustedTotalReceived - totalSales;
-      const finalCashFlowBalance = adjustedTotalReceived - (adjustedTotalPaidToFactory - totalPurchases);
       const finalFactoryBalance = adjustedTotalPaidToFactory - totalPurchases;
+      const finalCashFlowBalance = finalSalesBalance - finalFactoryBalance;
       const remainingQuantity = totalQuantityPurchased - totalQuantitySold;
 
       return {
@@ -126,7 +128,7 @@ export default function SuppliersReportPage() {
           <div className="relative w-full overflow-auto">
             <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
               <TableHeader><TableRow>
-                <TableHead>اسم المورد</TableHead><TableHead>مبلغ المشتريات</TableHead><TableHead>إجمالي المبيعات</TableHead><TableHead>المستلم (بعد التحويلات والدفعات)</TableHead><TableHead>الكمية المشتراة (طن)</TableHead><TableHead>الكمية المتبقية (طن)</TableHead><TableHead>قيمة الكمية المتبقية</TableHead><TableHead>رصيد المبيعات</TableHead><TableHead>الرصيد النقدي</TableHead><TableHead>رصيد لدى المصنع</TableHead><TableHead>عدد العمليات</TableHead><TableHead>إجراءات</TableHead>
+                <TableHead>اسم المورد</TableHead><TableHead>مبلغ المشتريات</TableHead><TableHead>إجمالي المبيعات</TableHead><TableHead>المستلم (بعد التسويات)</TableHead><TableHead>الكمية المشتراة (طن)</TableHead><TableHead>الكمية المتبقية (طن)</TableHead><TableHead>قيمة الكمية المتبقية</TableHead><TableHead>رصيد المبيعات</TableHead><TableHead>الرصيد النقدي</TableHead><TableHead>رصيد لدى المصنع</TableHead><TableHead>عدد العمليات</TableHead><TableHead>إجراءات</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {supplierSummaries.length > 0 ? (

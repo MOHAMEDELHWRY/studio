@@ -113,13 +113,17 @@ export default function SimplifiedSalesReport() {
             });
         } else if (event.type === 'payment') {
             const p = event.payload;
-            balance -= p.amount; // Payments to supplier are a debit on our side (money out)
+            const isRefund = p.classification === 'استعادة مبلغ كتسوية';
+            const amount = p.amount;
+
+            balance += isRefund ? amount : -amount; // Refunds are credit, payments are debit
+            
             rows.push({
                 id: p.id,
                 date: p.date,
-                description: `دفعة للمورد - ${p.reason}`,
-                credit: 0,
-                debit: p.amount,
+                description: `${isRefund ? 'استعادة مبلغ كتسوية' : 'دفعة للمورد'} - ${p.reason}`,
+                credit: isRefund ? amount : 0,
+                debit: !isRefund ? amount : 0,
                 balance: balance,
             });
         }

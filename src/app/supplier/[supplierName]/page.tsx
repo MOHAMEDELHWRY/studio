@@ -27,7 +27,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 export default function SupplierReportPage() {
   const router = useRouter();
   const params = useParams();
-  const { transactions, deleteSupplier, expenses, balanceTransfers } = useTransactions();
+  const { transactions, deleteSupplier, expenses, balanceTransfers, supplierPayments } = useTransactions();
   const { toast } = useToast();
 
   const supplierName = useMemo(() => {
@@ -138,7 +138,27 @@ export default function SupplierReportPage() {
         return acc;
     }, 0);
 
-    stats.totalReceivedFromSupplier += transferAdjustment;
+    const relatedPayments = supplierPayments.filter(p => p.supplierName === supplierName);
+
+    const salesPaymentAdjustment = relatedPayments.reduce((acc, p) => {
+        if (p.classification === 'استعادة مبلغ كتسوية') {
+            return acc + p.amount; // Refund is credit
+        }
+        if (p.classification !== 'سداد للمصنع عن المورد') {
+            return acc - p.amount; // Payment is debit
+        }
+        return acc;
+    }, 0);
+
+    const factoryPaymentAdjustment = relatedPayments.reduce((acc, p) => {
+        if (p.classification === 'سداد للمصنع عن المورد') {
+            return acc + p.amount;
+        }
+        return acc;
+    }, 0);
+
+    stats.totalReceivedFromSupplier += transferAdjustment + salesPaymentAdjustment;
+    stats.totalPaidToFactory += factoryPaymentAdjustment;
 
     const supplierExpensesList = expenses
       .filter(e => e.supplierName === supplierName)
@@ -149,16 +169,16 @@ export default function SupplierReportPage() {
       return { ...t, factoryRunningBalance: runningFactoryBalance };
     }).reverse();
     
-    const finalFactoryBalance = stats.totalPaidToFactory - stats.totalPurchases;
+    const finalFactoryBalanceCalc = stats.totalPaidToFactory - stats.totalPurchases;
 
     return { 
       transactionsWithBalances, 
       supplierStats: stats, 
       tonBreakdown: breakdown,
-      finalFactoryBalance,
+      finalFactoryBalance: finalFactoryBalanceCalc,
       supplierLinkedExpenses: supplierExpensesList,
     };
-  }, [supplierTransactionsAsc, expenses, supplierName, supplierRelatedTransfers]);
+  }, [supplierTransactionsAsc, expenses, supplierName, supplierRelatedTransfers, supplierPayments]);
   
   const handleDeleteSupplier = async () => {
     await deleteSupplier(supplierName);
@@ -271,7 +291,7 @@ export default function SupplierReportPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المستلم (بعد التحويلات)</CardTitle>
+            <CardTitle className="text-sm font-medium">إجمالي المستلم (بعد التسويات)</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
