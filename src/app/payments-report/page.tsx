@@ -80,6 +80,7 @@ export default function PaymentsReportPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<SupplierPayment | null>(null);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const supplierNames = useMemo(() => {
     return Array.from(new Set(transactions.map(t => t.supplierName))).sort();
@@ -138,20 +139,30 @@ export default function PaymentsReportPage() {
   };
 
   const onSubmit = async (values: PaymentFormValues) => {
-    const documentFile = values.document?.[0];
-    const { document, ...restOfValues } = values;
+    setIsSubmitting(true);
+    try {
+        const documentFile = values.document?.[0];
+        const { document, ...restOfValues } = values;
 
-    if (editingPayment) {
-        const updatedPaymentData: SupplierPayment = { ...editingPayment, ...restOfValues, documentUrl: editingPayment.documentUrl };
-        await updateSupplierPayment(updatedPaymentData, documentFile);
-    } else {
-      const newPaymentData: Omit<SupplierPayment, 'id'> = { ...restOfValues, documentUrl: '' };
-      await addSupplierPayment(newPaymentData, documentFile);
+        if (editingPayment) {
+            const updatedPaymentData: SupplierPayment = { ...editingPayment, ...restOfValues, documentUrl: editingPayment.documentUrl };
+            await updateSupplierPayment(updatedPaymentData, documentFile);
+            toast({ title: "نجاح", description: "تم تعديل الدفعة بنجاح." });
+        } else {
+            const newPaymentData: Omit<SupplierPayment, 'id'> = { ...restOfValues, documentUrl: '' };
+            await addSupplierPayment(newPaymentData, documentFile);
+            toast({ title: "نجاح", description: "تم تسجيل الدفعة بنجاح." });
+        }
+
+        form.reset();
+        setIsDialogOpen(false);
+        setEditingPayment(null);
+    } catch(error) {
+        console.error("Failed to submit payment:", error);
+        toast({ title: "خطأ", description: "فشل حفظ الدفعة. يرجى المحاولة مرة أخرى.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
     }
-
-    form.reset();
-    setIsDialogOpen(false);
-    setEditingPayment(null);
   };
 
   const handleDelete = async (paymentId: string) => {
@@ -227,9 +238,42 @@ export default function PaymentsReportPage() {
                   {paymentMethodWatcher === 'بنكي' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md"><FormField control={form.control} name="sourceBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول منه</FormLabel><FormControl><Input placeholder="حساب الشركة" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="destinationBank" render={({ field }) => (<FormItem><FormLabel>البنك المحول إليه</FormLabel><FormControl><Input placeholder="بنك المورد" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} /></div>)}
                   
                   <FormField control={form.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للصرف..." {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  <FormField control={form.control} name="document" render={({ field: { value, onChange, ...rest } }) => (<FormItem><FormLabel>رفع مستند التحويل (اختياري)</FormLabel><FormControl><Input type="file" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl><FormMessage /></FormItem>)} />
-                  {editingPayment?.documentUrl && !paymentDocumentWatcher?.length && (<div className="text-sm"><span className="font-medium">المستند الحالي: </span><a href={editingPayment.documentUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">عرض المستند</a><p className="text-xs text-muted-foreground">للتغيير، قم برفع ملف جديد.</p></div>)}
-                  <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose><Button type="submit">{editingPayment ? 'حفظ التعديلات' : 'تسجيل الدفعة'}</Button></DialogFooter>
+                  
+                  <FormField
+                    control={form.control}
+                    name="document"
+                    render={({ field: { value, onChange, ...fieldProps } }) => (
+                      <FormItem>
+                        <FormLabel>رفع مستند التحويل (اختياري)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="file"
+                            onChange={(event) =>
+                              onChange(event.target.files && event.target.files.length > 0 ? event.target.files : undefined)
+                            }
+                            {...fieldProps}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {editingPayment?.documentUrl && !paymentDocumentWatcher?.length ? (
+                    <div className="text-sm">
+                      <span className="font-medium">المستند الحالي: </span>
+                      <a href={editingPayment.documentUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">عرض المستند</a>
+                      <p className="text-xs text-muted-foreground">للتغيير، قم برفع ملف جديد.</p>
+                    </div>
+                  ) : null}
+
+                  <DialogFooter className="pt-4">
+                     <DialogClose asChild>
+                      <Button type="button" variant="secondary">إلغاء</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? 'جاري الحفظ...' : (editingPayment ? 'حفظ التعديلات' : 'تسجيل الدفعة')}
+                    </Button>
+                  </DialogFooter>
                 </form>
               </Form>
             </DialogContent>
