@@ -343,25 +343,32 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id' | 'documentUrl'>, documentFile?: File) => {
     if (!currentUser) throw new Error("User not authenticated");
     
-    const paymentDocRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
-
     try {
-        let documentUrl = '';
-        if (documentFile) {
-            const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${paymentDocRef.id}/${documentFile.name}`);
-            await uploadBytes(fileRef, documentFile);
-            documentUrl = await getDownloadURL(fileRef);
-        }
+      // 1. Create the document with a placeholder URL first.
+      const docRef = await addDoc(collection(db, 'users', currentUser.uid, 'supplierPayments'), {
+        ...payment,
+        date: payment.date.toISOString(),
+        documentUrl: '', // Placeholder
+      });
 
-        const newPaymentData = { ...payment, date: payment.date.toISOString(), documentUrl };
-        await setDoc(paymentDocRef, newPaymentData);
+      let documentUrl = '';
+      if (documentFile) {
+        // 2. If there's a file, upload it using the ID from the created document.
+        const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${docRef.id}/${documentFile.name}`);
+        await uploadBytes(fileRef, documentFile);
+        documentUrl = await getDownloadURL(fileRef);
 
-        const finalPayment: SupplierPayment = { ...payment, id: paymentDocRef.id, documentUrl };
-        setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
+        // 3. Update the document with the real file URL.
+        await updateDoc(docRef, { documentUrl: documentUrl });
+      }
+
+      // 4. Update the local React state with the complete data.
+      const finalPayment: SupplierPayment = { ...payment, id: docRef.id, documentUrl };
+      setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
 
     } catch (error) {
-        console.error("Error adding supplier payment: ", error);
-        throw error;
+      console.error("Error adding supplier payment: ", error);
+      throw error;
     }
   };
 
@@ -371,15 +378,18 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', id);
 
     try {
-        let newDocumentUrl = dataToUpdate.documentUrl;
-        const oldDocumentUrl = dataToUpdate.documentUrl;
+        const docSnap = await getDoc(paymentDocRef);
+        const oldDocumentUrl = docSnap.exists() ? (docSnap.data() as SupplierPayment).documentUrl : undefined;
 
+        let newDocumentUrl = oldDocumentUrl;
+
+        // If a new file is provided, upload it and get the new URL.
         if (documentFile) {
             const newFileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${id}/${documentFile.name}`);
             await uploadBytes(newFileRef, documentFile);
             newDocumentUrl = await getDownloadURL(newFileRef);
         }
-
+        
         const docData = {
             ...dataToUpdate,
             date: updatedPayment.date.toISOString(),
@@ -388,13 +398,14 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
 
         await updateDoc(paymentDocRef, docData as any);
 
+        // If a new file was uploaded AND there was an old file AND they are different, delete the old one.
         if (documentFile && oldDocumentUrl && oldDocumentUrl !== newDocumentUrl) {
             try {
                 const oldFileRef = storageRef(storage, oldDocumentUrl);
                 await deleteObject(oldFileRef);
             } catch (storageError: any) {
                 if (storageError.code !== 'storage/object-not-found') {
-                    console.error("Could not delete old file from storage, but update was successful.", storageError);
+                    console.error("Could not delete old file, but update was successful.", storageError);
                 }
             }
         }
