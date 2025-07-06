@@ -21,4 +21,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 
+storage.maxUploadRetryTime = 300000;
+storage.maxOperationRetryTime = 300000;
+
 export { app, db, auth, storage };
