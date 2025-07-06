@@ -343,30 +343,24 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id' | 'documentUrl'>, documentFile?: File) => {
     if (!currentUser) throw new Error("User not authenticated");
     
-    // 1. Generate a new document reference *without* creating it in the DB yet
     const paymentDocRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
 
     try {
         let documentUrl = '';
-        // 2. Upload file if it exists
         if (documentFile) {
             const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${paymentDocRef.id}/${documentFile.name}`);
             await uploadBytes(fileRef, documentFile);
             documentUrl = await getDownloadURL(fileRef);
         }
 
-        // 3. Create the document in Firestore with the final data
         const newPaymentData = { ...payment, date: payment.date.toISOString(), documentUrl };
         await setDoc(paymentDocRef, newPaymentData);
 
-        // 4. Update local state
         const finalPayment: SupplierPayment = { ...payment, id: paymentDocRef.id, documentUrl };
         setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
 
     } catch (error) {
         console.error("Error adding supplier payment: ", error);
-        // If upload fails, the error is thrown before setDoc is called.
-        // If setDoc fails, the file might be orphaned, but that's a lesser evil.
         throw error;
     }
   };
@@ -378,11 +372,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
 
     try {
         let newDocumentUrl = dataToUpdate.documentUrl;
-        const oldDocSnap = await getDoc(paymentDocRef);
-        const oldDocumentUrl = oldDocSnap.exists() ? (oldDocSnap.data() as SupplierPayment).documentUrl : undefined;
+        const oldDocumentUrl = dataToUpdate.documentUrl;
 
         if (documentFile) {
-            // Upload new file first
             const newFileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${id}/${documentFile.name}`);
             await uploadBytes(newFileRef, documentFile);
             newDocumentUrl = await getDownloadURL(newFileRef);
@@ -396,7 +388,6 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
 
         await updateDoc(paymentDocRef, docData as any);
 
-        // After successful DB update, delete the old file if a new one was uploaded
         if (documentFile && oldDocumentUrl && oldDocumentUrl !== newDocumentUrl) {
             try {
                 const oldFileRef = storageRef(storage, oldDocumentUrl);
