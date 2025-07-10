@@ -51,6 +51,4 @@ export type SupplierPayment = {
   destinationBank?: string;
   reason: string;
   responsiblePerson: string;
-  documentUrl?: string;
-  documentUploadStatus?: 'uploading' | 'completed' | 'failed' | 'none';
 };
