@@ -385,56 +385,45 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id' | 'documentUrl' | 'documentUploadStatus'>, documentFile?: File) => {
     if (!currentUser) throw new Error("User not authenticated for payment");
 
+    // Generate a new document reference with a unique ID
     const paymentDocRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
     const paymentId = paymentDocRef.id;
-
-    // First, save the payment data without the documentUrl
-    const paymentData = {
-        ...payment,
-        date: Timestamp.fromDate(payment.date),
-        documentUrl: '', // Will be updated later
-        documentUploadStatus: documentFile ? 'uploading' : 'none'
+    
+    // Optimistically update UI
+    const newPayment: SupplierPayment = {
+      ...payment,
+      id: paymentId,
+      documentUploadStatus: documentFile ? 'uploading' : 'none',
     };
+    setSupplierPayments(prev => [newPayment, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
 
     try {
-        await setDoc(paymentDocRef, paymentData);
+      let documentUrl = '';
+      if (documentFile) {
+        const fileRef = storageRef(storage, `users/${currentUser.uid}/transfers/${paymentId}/${documentFile.name}`);
+        await uploadBytes(fileRef, documentFile);
+        documentUrl = await getDownloadURL(fileRef);
+      }
 
-        // Optimistically update UI
-        const newPayment: SupplierPayment = {
-            ...payment,
-            id: paymentId,
-            documentUploadStatus: documentFile ? 'uploading' : 'none',
-        };
-        setSupplierPayments(prev => [newPayment, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
+      const paymentData = {
+          ...payment,
+          date: Timestamp.fromDate(payment.date),
+          documentUrl: documentUrl,
+          documentUploadStatus: documentFile ? 'completed' : 'none'
+      };
 
-        if (documentFile) {
-            // Upload the file
-            const fileRef = storageRef(storage, `users/${currentUser.uid}/transfers/${paymentId}/${documentFile.name}`);
-            await uploadBytes(fileRef, documentFile);
-            const documentUrl = await getDownloadURL(fileRef);
-
-            // Then, update the payment doc with the URL
-            await updateDoc(paymentDocRef, { documentUrl: documentUrl, documentUploadStatus: 'completed' });
-
-            // Update UI with final state
-            setSupplierPayments(prev => prev.map(p =>
-                p.id === paymentId ? { ...p, documentUrl, documentUploadStatus: 'completed' } : p
-            ));
-        }
+      await setDoc(paymentDocRef, paymentData);
+      
+      // Update UI with final state
+      setSupplierPayments(prev => prev.map(p =>
+          p.id === paymentId ? { ...p, documentUrl, documentUploadStatus: 'completed' } : p
+      ));
     } catch (error) {
-        console.error("Error saving payment:", error);
-        
-        // If something fails, try to clean up
-        try {
-            await deleteDoc(paymentDocRef);
-        } catch (cleanupError) {
-            console.error("Cleanup failed:", cleanupError);
-        }
-
-        // Revert optimistic UI update
-        setSupplierPayments(prev => prev.filter(p => p.id !== paymentId));
-        toast({ title: "خطأ", description: "فشل حفظ الدفعة. يرجى المحاولة مرة أخرى.", variant: "destructive" });
-        throw error;
+      console.error("Error saving payment:", error);
+      // Revert optimistic UI update on failure
+      setSupplierPayments(prev => prev.filter(p => p.id !== paymentId));
+      toast({ title: "خطأ", description: "فشل حفظ الدفعة. يرجى المحاولة مرة أخرى.", variant: "destructive" });
+      throw error;
     }
   };
   
@@ -481,7 +470,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
 
         setSupplierPayments(prev => prev.map(p => 
             p.id === id ? { ...updatedPayment, documentUrl: newDocumentUrl, documentUploadStatus: 'completed' } : p
-        ));
+        ).sort((a,b) => b.date.getTime() - a.date.getTime()));
 
     } catch (error) {
         console.error("Error updating supplier payment:", error);
