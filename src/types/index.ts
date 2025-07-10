@@ -35,9 +35,9 @@ export type BalanceTransfer = {
   amount: number;
   fromSupplier: string;
   toSupplier: string;
+  fromAccount: 'sales_balance' | 'factory_balance' | 'profit_expense';
+  toAccount: 'sales_balance' | 'factory_balance';
   reason: string;
-  method: string;
-  classification: string;
 };
 
 export type SupplierPayment = {

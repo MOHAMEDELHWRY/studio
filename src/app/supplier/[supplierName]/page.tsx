@@ -86,7 +86,6 @@ export default function SupplierReportPage() {
     let remainingStockValue = 0;
 
     supplierTransactionsAsc.forEach(t => {
-      // Aggregate main stats
       stats.totalPurchases += t.totalPurchasePrice;
       stats.totalSales += t.totalSellingPrice;
       stats.totalPaidToFactory += t.amountPaidToFactory;
@@ -101,7 +100,6 @@ export default function SupplierReportPage() {
         remainingStockValue += t.totalPurchasePrice;
       }
 
-      // Category breakdown
       if (t.category) {
           if (!breakdown.byCategory[t.category]) {
               breakdown.byCategory[t.category] = { purchased: 0, sold: 0 };
@@ -112,7 +110,6 @@ export default function SupplierReportPage() {
           }
       }
 
-      // Variety breakdown
       if (t.variety) {
           if (!breakdown.byVariety[t.variety]) {
               breakdown.byVariety[t.variety] = { purchased: 0, sold: 0 };
@@ -132,33 +129,34 @@ export default function SupplierReportPage() {
 
     stats.totalProfit = stats.totalSales - costOfGoodsSold - totalTaxesOnSoldItems - supplierExpensesTotal;
     
-    const transferAdjustment = supplierRelatedTransfers.reduce((acc, t) => {
-        if (t.toSupplier === supplierName) return acc + t.amount;
-        if (t.fromSupplier === supplierName) return acc - t.amount;
-        return acc;
-    }, 0);
+    let salesBalanceAdjustment = 0;
+    let factoryBalanceAdjustment = 0;
+
+    supplierRelatedTransfers.forEach(t => {
+      if (t.fromSupplier === supplierName) {
+        if (t.fromAccount === 'sales_balance') salesBalanceAdjustment -= t.amount;
+        if (t.fromAccount === 'factory_balance') factoryBalanceAdjustment -= t.amount;
+      }
+      if (t.toSupplier === supplierName) {
+        if (t.toAccount === 'sales_balance') salesBalanceAdjustment += t.amount;
+        if (t.toAccount === 'factory_balance') factoryBalanceAdjustment += t.amount;
+      }
+    });
 
     const relatedPayments = supplierPayments.filter(p => p.supplierName === supplierName);
 
-    const salesPaymentAdjustment = relatedPayments.reduce((acc, p) => {
-        if (p.classification === 'استعادة مبلغ كتسوية') {
-            return acc + p.amount; // Refund is credit
-        }
-        if (p.classification !== 'سداد للمصنع عن المورد') {
-            return acc - p.amount; // Payment is debit
-        }
-        return acc;
-    }, 0);
-
-    const factoryPaymentAdjustment = relatedPayments.reduce((acc, p) => {
+    relatedPayments.forEach(p => {
         if (p.classification === 'سداد للمصنع عن المورد') {
-            return acc + p.amount;
+          factoryBalanceAdjustment += p.amount;
+        } else if (p.classification === 'استعادة مبلغ كتسوية') {
+          salesBalanceAdjustment += p.amount;
+        } else { // Payments and profit withdrawals
+          salesBalanceAdjustment -= p.amount;
         }
-        return acc;
-    }, 0);
+    });
 
-    stats.totalReceivedFromSupplier += transferAdjustment + salesPaymentAdjustment;
-    stats.totalPaidToFactory += factoryPaymentAdjustment;
+    stats.totalReceivedFromSupplier += salesBalanceAdjustment;
+    stats.totalPaidToFactory += factoryBalanceAdjustment;
 
     const supplierExpensesList = expenses
       .filter(e => e.supplierName === supplierName)
@@ -198,6 +196,15 @@ export default function SupplierReportPage() {
       </div>
     );
   }
+
+  const getTransferAccountName = (account: string) => {
+    switch (account) {
+      case 'sales_balance': return 'رصيد المبيعات';
+      case 'factory_balance': return 'رصيد المصنع';
+      case 'profit_expense': return 'خصم من الأرباح (كمصروف)';
+      default: return account;
+    }
+  };
   
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -359,6 +366,7 @@ export default function SupplierReportPage() {
                     <TableHead>التاريخ</TableHead>
                     <TableHead>نوع التحويل</TableHead>
                     <TableHead>المورد الآخر</TableHead>
+                    <TableHead>التفاصيل</TableHead>
                     <TableHead>المبلغ</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -374,6 +382,13 @@ export default function SupplierReportPage() {
                         )}
                       </TableCell>
                        <TableCell>{t.fromSupplier === supplierName ? t.toSupplier : t.fromSupplier}</TableCell>
+                       <TableCell className="text-xs">
+                          {t.fromSupplier === supplierName ? (
+                             <span>من: {getTransferAccountName(t.fromAccount)}</span>
+                          ) : (
+                             <span>إلى: {getTransferAccountName(t.toAccount)}</span>
+                          )}
+                      </TableCell>
                       <TableCell className="font-bold">{t.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                     </TableRow>
                   ))}

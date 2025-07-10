@@ -62,9 +62,13 @@ const transferSchema = z.object({
   amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
   fromSupplier: z.string().min(1, "يجب اختيار المورد المحول منه."),
   toSupplier: z.string().min(1, "يجب اختيار المورد المحول إليه."),
+  fromAccount: z.enum(['sales_balance', 'factory_balance', 'profit_expense'], {
+    required_error: "يجب تحديد الحساب المحول منه.",
+  }),
+  toAccount: z.enum(['sales_balance', 'factory_balance'], {
+    required_error: "يجب تحديد الحساب المحول إليه.",
+  }),
   reason: z.string().trim().min(1, "يجب كتابة سبب التحويل."),
-  method: z.string().trim().min(1, "يجب تحديد طريقة التحويل."),
-  classification: z.string().min(1, "يجب تحديد تصنيف التحويل."),
 }).refine(data => data.fromSupplier !== data.toSupplier, {
   message: "لا يمكن التحويل إلى نفس المورد.",
   path: ["toSupplier"],
@@ -91,9 +95,9 @@ export default function TransfersReportPage() {
       amount: 0,
       fromSupplier: "",
       toSupplier: "",
+      fromAccount: 'sales_balance',
+      toAccount: 'sales_balance',
       reason: "",
-      method: "تحويل بنكي",
-      classification: "تسوية رصيد مبيعات",
     },
   });
   
@@ -110,9 +114,9 @@ export default function TransfersReportPage() {
         amount: 0,
         fromSupplier: "",
         toSupplier: "",
+        fromAccount: 'sales_balance',
+        toAccount: 'sales_balance',
         reason: "",
-        method: "تحويل بنكي",
-        classification: "تسوية رصيد مبيعات",
       });
     }
     setIsDialogOpen(true);
@@ -161,6 +165,15 @@ export default function TransfersReportPage() {
     return [...balanceTransfers].sort((a,b) => b.date.getTime() - a.date.getTime());
   }, [balanceTransfers]);
 
+  const getAccountName = (account: string) => {
+    switch (account) {
+      case 'sales_balance': return 'رصيد المبيعات';
+      case 'factory_balance': return 'رصيد المصنع';
+      case 'profit_expense': return 'خصم من الأرباح (كمصروف)';
+      default: return account;
+    }
+  };
+
   return (
     <div className="container mx-auto p-4 md:p-8">
       <header className="flex items-center justify-between mb-8 gap-4">
@@ -206,24 +219,24 @@ export default function TransfersReportPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
               <FormField control={form.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>تاريخ التحويل</FormLabel><Popover modal={false} open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="ml-2 h-4 w-4" />{field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}</Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={field.value} onSelect={(d) => { field.onChange(d); setIsDatePopoverOpen(false); }} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="fromSupplier" render={({ field }) => (<FormItem><FormLabel>المورد المحول منه</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="toSupplier" render={({ field }) => (<FormItem><FormLabel>المورد المحول إليه</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="classification" render={({ field }) => (
-                  <FormItem>
-                      <FormLabel>تصنيف التحويل</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="اختر التصنيف..." /></SelectTrigger></FormControl>
-                          <SelectContent>
-                              <SelectItem value="تسوية رصيد مبيعات">تسوية رصيد مبيعات</SelectItem>
-                              <SelectItem value="تسوية رصيد مصنع">تسوية رصيد مصنع</SelectItem>
-                              <SelectItem value="تحويل عام">تحويل عام</SelectItem>
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                  </FormItem>
-              )} />
               <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>المبلغ المحول</FormLabel><FormControl><Input type="number" placeholder="0" {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="method" render={({ field }) => (<FormItem><FormLabel>طريقة التحويل</FormLabel><FormControl><Input placeholder="مثال: تحويل بنكي" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              
+              <div className='p-4 border rounded-md'>
+                <FormLabel className="mb-4 block font-semibold text-primary">من المورد</FormLabel>
+                <div className="grid gap-4">
+                  <FormField control={form.control} name="fromSupplier" render={({ field }) => (<FormItem><FormLabel>اسم المورد</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد المحول منه..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="fromAccount" render={({ field }) => (<FormItem><FormLabel>خصم من حساب</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر الحساب..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="sales_balance">رصيد المبيعات</SelectItem><SelectItem value="factory_balance">رصيد المصنع</SelectItem><SelectItem value="profit_expense">خصم من الأرباح (كمصروف)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                </div>
+              </div>
+
+              <div className='p-4 border rounded-md'>
+                <FormLabel className="mb-4 block font-semibold text-primary">إلى المورد</FormLabel>
+                <div className="grid gap-4">
+                  <FormField control={form.control} name="toSupplier" render={({ field }) => (<FormItem><FormLabel>اسم المورد</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر المورد المحول إليه..." /></SelectTrigger></FormControl><SelectContent>{supplierNames.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="toAccount" render={({ field }) => (<FormItem><FormLabel>إضافة إلى حساب</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="اختر الحساب..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="sales_balance">رصيد المبيعات</SelectItem><SelectItem value="factory_balance">رصيد المصنع</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                </div>
+              </div>
+
               <FormField control={form.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للتحويل..." {...field} /></FormControl><FormMessage /></FormItem>)} />
               <DialogFooter className="pt-4">
                  <DialogClose asChild><Button type="button" variant="secondary">إلغاء</Button></DialogClose>
@@ -243,7 +256,7 @@ export default function TransfersReportPage() {
         <CardContent>
            <div className="relative w-full overflow-auto">
             <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-              <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المحول منه</TableHead><TableHead>المحول إليه</TableHead><TableHead>المبلغ</TableHead><TableHead>التصنيف</TableHead><TableHead>السبب</TableHead><TableHead>الطريقة</TableHead><TableHead>إجراءات</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المحول منه</TableHead><TableHead>المحول إليه</TableHead><TableHead>المبلغ</TableHead><TableHead>التفاصيل</TableHead><TableHead>السبب</TableHead><TableHead>إجراءات</TableHead></TableRow></TableHeader>
               <TableBody>
                 {sortedTransfers.length > 0 ? (
                   sortedTransfers.map(t => (
@@ -252,9 +265,13 @@ export default function TransfersReportPage() {
                       <TableCell className="font-medium text-destructive">{t.fromSupplier}</TableCell>
                       <TableCell className="font-medium text-success">{t.toSupplier}</TableCell>
                       <TableCell className="font-bold">{t.amount.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
-                      <TableCell>{t.classification}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="flex flex-col">
+                          <span><span className="font-semibold text-destructive">من: </span>{getAccountName(t.fromAccount)}</span>
+                          <span><span className="font-semibold text-success">إلى: </span>{getAccountName(t.toAccount)}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>{t.reason}</TableCell>
-                      <TableCell>{t.method}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary">
@@ -273,7 +290,7 @@ export default function TransfersReportPage() {
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={8} className="h-24 text-center">لا توجد تحويلات مسجلة.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-24 text-center">لا توجد تحويلات مسجلة.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

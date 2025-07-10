@@ -37,37 +37,25 @@ interface SupplierSummary {
 }
 
 export default function SuppliersReportPage() {
-  const { transactions, deleteSupplier, balanceTransfers, supplierPayments } = useTransactions();
+  const { transactions, deleteSupplier, balanceTransfers, supplierPayments, expenses } = useTransactions();
 
   const supplierSummaries = useMemo(() => {
-    const supplierData: { [key: string]: Transaction[] } = {};
-    transactions.forEach(t => {
-      if (!supplierData[t.supplierName]) supplierData[t.supplierName] = [];
-      supplierData[t.supplierName].push(t);
+    const supplierNames = new Set<string>();
+    transactions.forEach(t => supplierNames.add(t.supplierName));
+    balanceTransfers.forEach(t => {
+      supplierNames.add(t.fromSupplier);
+      supplierNames.add(t.toSupplier);
+    });
+    supplierPayments.forEach(p => supplierNames.add(p.supplierName));
+    expenses.forEach(e => {
+      if (e.supplierName) supplierNames.add(e.supplierName);
     });
 
-    const transferAdjustments = new Map<string, number>();
-    balanceTransfers.forEach(transfer => {
-      transferAdjustments.set(transfer.fromSupplier, (transferAdjustments.get(transfer.fromSupplier) || 0) - transfer.amount);
-      transferAdjustments.set(transfer.toSupplier, (transferAdjustments.get(transfer.toSupplier) || 0) + transfer.amount);
-    });
-
-    const salesPaymentAdjustments = new Map<string, number>();
-    const factoryPaymentAdjustments = new Map<string, number>();
-
-    supplierPayments.forEach(payment => {
-      if (payment.classification === 'سداد للمصنع عن المورد') {
-        factoryPaymentAdjustments.set(payment.supplierName, (factoryPaymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
-      } else if (payment.classification === 'استعادة مبلغ كتسوية') {
-        salesPaymentAdjustments.set(payment.supplierName, (salesPaymentAdjustments.get(payment.supplierName) || 0) - payment.amount);
-      } else { // 'دفعة من رصيد المبيعات' or 'سحب أرباح للمورد'
-        salesPaymentAdjustments.set(payment.supplierName, (salesPaymentAdjustments.get(payment.supplierName) || 0) + payment.amount);
-      }
-    });
-
-    const summaries: SupplierSummary[] = Object.keys(supplierData).map(supplierName => {
-      const supplierTransactions = supplierData[supplierName];
-      let totalSales = 0, totalPurchases = 0, totalPaidToFactory = 0, totalReceivedFromSupplier = 0, totalQuantityPurchased = 0, totalQuantitySold = 0, remainingStockValue = 0;
+    const summaries: SupplierSummary[] = Array.from(supplierNames).map(supplierName => {
+      const supplierTransactions = transactions.filter(t => t.supplierName === supplierName);
+      
+      let totalSales = 0, totalPurchases = 0, totalPaidToFactory = 0, totalReceivedFromSupplier = 0,
+          totalQuantityPurchased = 0, totalQuantitySold = 0, remainingStockValue = 0, taxesOnSold = 0;
       
       supplierTransactions.forEach(t => {
         totalSales += t.totalSellingPrice;
@@ -75,16 +63,42 @@ export default function SuppliersReportPage() {
         totalPaidToFactory += t.amountPaidToFactory;
         totalReceivedFromSupplier += t.amountReceivedFromSupplier;
         totalQuantityPurchased += t.quantity;
-        if (t.totalSellingPrice > 0) totalQuantitySold += t.quantity;
-        else remainingStockValue += t.totalPurchasePrice;
+        if (t.totalSellingPrice > 0) {
+          totalQuantitySold += t.quantity;
+          taxesOnSold += t.taxes;
+        } else {
+          remainingStockValue += t.totalPurchasePrice;
+        }
       });
       
-      const transferAdj = transferAdjustments.get(supplierName) || 0;
-      const salesPaymentAdj = salesPaymentAdjustments.get(supplierName) || 0;
-      const factoryPaymentAdj = factoryPaymentAdjustments.get(supplierName) || 0;
+      let salesBalanceAdjustment = 0;
+      let factoryBalanceAdjustment = 0;
+
+      balanceTransfers.forEach(t => {
+        if (t.fromSupplier === supplierName) {
+          if (t.fromAccount === 'sales_balance') salesBalanceAdjustment -= t.amount;
+          if (t.fromAccount === 'factory_balance') factoryBalanceAdjustment -= t.amount;
+        }
+        if (t.toSupplier === supplierName) {
+          if (t.toAccount === 'sales_balance') salesBalanceAdjustment += t.amount;
+          if (t.toAccount === 'factory_balance') factoryBalanceAdjustment += t.amount;
+        }
+      });
       
-      const adjustedTotalReceived = totalReceivedFromSupplier + transferAdj - salesPaymentAdj;
-      const adjustedTotalPaidToFactory = totalPaidToFactory + factoryPaymentAdj;
+      supplierPayments.forEach(p => {
+        if (p.supplierName === supplierName) {
+          if (p.classification === 'سداد للمصنع عن المورد') {
+            factoryBalanceAdjustment += p.amount;
+          } else if (p.classification === 'استعادة مبلغ كتسوية') {
+            salesBalanceAdjustment += p.amount;
+          } else {
+            salesBalanceAdjustment -= p.amount;
+          }
+        }
+      });
+      
+      const adjustedTotalReceived = totalReceivedFromSupplier + salesBalanceAdjustment;
+      const adjustedTotalPaidToFactory = totalPaidToFactory + factoryBalanceAdjustment;
 
       const finalSalesBalance = adjustedTotalReceived - totalSales;
       const finalFactoryBalance = adjustedTotalPaidToFactory - totalPurchases;
@@ -97,8 +111,9 @@ export default function SuppliersReportPage() {
         transactionCount: supplierTransactions.length,
       };
     });
+
     return summaries.sort((a, b) => b.totalSales - a.totalSales);
-  }, [transactions, balanceTransfers, supplierPayments]);
+  }, [transactions, balanceTransfers, supplierPayments, expenses]);
   
   const { totalSuppliers, totalFactoryBalance } = useMemo(() => {
     const factoryBalance = supplierSummaries.reduce((acc, curr) => acc + curr.finalFactoryBalance, 0);
