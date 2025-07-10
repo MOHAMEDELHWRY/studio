@@ -9,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBlKr5prSIXiW6UPzpI8MDj7wVdOXLrGtY",
   authDomain: "retsary-e622c.firebaseapp.com",
   projectId: "retsary-e622c",
-  storageBucket: "retsary-e622c.firebasestorage.app",
+  storageBucket: "retsary-e622c.appspot.com",
   messagingSenderId: "1080480805531",
   appId: "1:1080480805531:web:326d55de0777df33914c3e",
   measurementId: "G-4NFQ9CH8Z0"
