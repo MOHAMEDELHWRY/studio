@@ -293,6 +293,7 @@ export default function PaymentsReportPage() {
                         <FormControl>
                           <Input
                             type="file"
+                            accept="image/*,.pdf"
                             onChange={(event) => {
                               const files = event.target.files;
                               onChange(files && files.length > 0 ? files : null);
