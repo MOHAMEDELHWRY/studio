@@ -152,6 +152,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
             id: doc.id,
             date,
             classification: classification || 'دفعة من رصيد المبيعات', 
+            documentUrl: data.documentUrl || '',
           } as SupplierPayment;
         });
         setSupplierPayments(fetchedPayments.sort((a, b) => b.date.getTime() - a.date.getTime()));
@@ -540,3 +541,5 @@ export function useTransactions() {
   }
   return context;
 }
+
+    
