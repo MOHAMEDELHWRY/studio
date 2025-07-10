@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -6,7 +7,7 @@ import Link from 'next/link';
 import { useTransactions } from '@/context/transactions-context';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { DollarSign, Package, Trash2, Factory, LineChart, Share2, Landmark, Warehouse, FileText, Wallet, ArrowRightLeft } from 'lucide-react';
+import { DollarSign, Package, Trash2, Factory, LineChart, Share2, Landmark, Warehouse, FileText, Wallet, ArrowRightLeft, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -27,13 +28,23 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 export default function SupplierReportPage() {
   const router = useRouter();
   const params = useParams();
-  const { transactions, deleteSupplier, expenses, balanceTransfers, supplierPayments } = useTransactions();
+  const { transactions, deleteSupplier, expenses, balanceTransfers, supplierPayments, supplierNames } = useTransactions();
   const { toast } = useToast();
 
   const supplierName = useMemo(() => {
     const name = params.supplierName;
     return typeof name === 'string' ? decodeURIComponent(name) : '';
   }, [params.supplierName]);
+
+  const { previousSupplier, nextSupplier } = useMemo(() => {
+    const currentIndex = supplierNames.findIndex(name => name === supplierName);
+    if (currentIndex === -1) {
+      return { previousSupplier: null, nextSupplier: null };
+    }
+    const prev = currentIndex > 0 ? supplierNames[currentIndex - 1] : null;
+    const next = currentIndex < supplierNames.length - 1 ? supplierNames[currentIndex + 1] : null;
+    return { previousSupplier: prev, nextSupplier: next };
+  }, [supplierNames, supplierName]);
 
   const supplierTransactionsAsc = useMemo(() => {
     if (!supplierName) return [];
@@ -208,12 +219,24 @@ export default function SupplierReportPage() {
   
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="flex justify-between items-center mb-8 flex-wrap gap-4">
+      <header className="flex justify-between items-start mb-8 flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <SidebarTrigger />
-          <h1 className="text-3xl font-bold text-primary">تقرير المورد: {supplierName}</h1>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="icon" disabled={!previousSupplier}>
+                <Link href={previousSupplier ? `/supplier/${encodeURIComponent(previousSupplier)}` : '#'}>
+                    <ArrowRight className="h-4 w-4" />
+                </Link>
+            </Button>
+            <h1 className="text-xl md:text-3xl font-bold text-primary text-center">تقرير المورد: {supplierName}</h1>
+             <Button asChild variant="outline" size="icon" disabled={!nextSupplier}>
+                <Link href={nextSupplier ? `/supplier/${encodeURIComponent(nextSupplier)}` : '#'}>
+                    <ArrowLeft className="h-4 w-4" />
+                </Link>
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap justify-end">
            <Button asChild variant="outline">
               <Link href={`/share/supplier/${encodeURIComponent(supplierName)}`} target="_blank" rel="noopener noreferrer">
                 <Share2 className="ml-2 h-4 w-4" />

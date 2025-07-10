@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
 import { type Transaction, type Expense, type BalanceTransfer, type SupplierPayment } from '@/types';
 import { db, storage } from '@/lib/firebase';
 import { 
@@ -42,9 +42,10 @@ interface TransactionsContextType {
   updateBalanceTransfer: (updatedTransfer: BalanceTransfer) => Promise<void>;
   deleteBalanceTransfer: (transferId: string) => Promise<void>;
   supplierPayments: SupplierPayment[];
-  addSupplierPayment: (payment: Omit<SupplierPayment, 'id' | 'documentUrl' | 'documentUploadStatus'>, documentFile?: File) => Promise<void>;
+  addSupplierPayment: (payment: Omit<SupplierPayment, 'id' | 'documentUrl'>, documentFile?: File) => Promise<void>;
   updateSupplierPayment: (updatedPayment: SupplierPayment, documentFile?: File) => Promise<void>;
   deleteSupplierPayment: (paymentId: string) => Promise<void>;
+  supplierNames: string[];
   loading: boolean;
 }
 
@@ -58,6 +59,18 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  
+  const supplierNames = useMemo(() => {
+    const allNames = new Set<string>();
+    transactions.forEach(t => allNames.add(t.supplierName));
+    expenses.forEach(e => { if (e.supplierName) allNames.add(e.supplierName) });
+    balanceTransfers.forEach(t => {
+      allNames.add(t.fromSupplier);
+      allNames.add(t.toSupplier);
+    });
+    supplierPayments.forEach(p => allNames.add(p.supplierName));
+    return Array.from(allNames).sort((a,b) => a.localeCompare(b));
+  }, [transactions, expenses, balanceTransfers, supplierPayments]);
 
   const handleBackgroundUpload = async (paymentId: string, documentFile: File, userId: string) => {
       try {
@@ -393,31 +406,43 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id' | 'documentUrl' | 'documentUploadStatus'>, documentFile?: File) => {
+  const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id' | 'documentUrl'>, documentFile?: File) => {
     if (!currentUser) throw new Error("User not authenticated");
-
-    const paymentDocRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
-    const tempPaymentId = paymentDocRef.id;
-
-    const dataToSave: Omit<SupplierPayment, 'id'> = {
-        ...payment,
-        documentUrl: '',
-        documentUploadStatus: documentFile ? 'uploading' : 'none',
+    
+    // Optimistic UI update
+    const tempId = `temp_${Date.now()}`;
+    const newPayment: SupplierPayment = {
+      ...payment,
+      id: tempId,
+      documentUrl: documentFile ? URL.createObjectURL(documentFile) : undefined,
+      documentUploadStatus: documentFile ? 'uploading' : 'none',
     };
+    setSupplierPayments(prev => [newPayment, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
 
-    const finalPayment: SupplierPayment = { ...dataToSave, id: tempPaymentId };
-
-    setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
-
-    const docData = { ...payment, date: Timestamp.fromDate(payment.date), documentUploadStatus: dataToSave.documentUploadStatus };
     try {
-        await setDoc(paymentDocRef, docData);
+        let finalDocumentUrl: string | undefined = undefined;
         if (documentFile) {
-            handleBackgroundUpload(tempPaymentId, documentFile, currentUser.uid);
+            const docRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
+            const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${docRef.id}/${documentFile.name}`);
+            await uploadBytes(fileRef, documentFile);
+            finalDocumentUrl = await getDownloadURL(fileRef);
+
+            // Save to Firestore with the final URL
+            const docData = { ...payment, date: Timestamp.fromDate(payment.date), documentUrl: finalDocumentUrl };
+            await setDoc(docRef, docData);
+
+            // Update optimistic UI with final data
+            setSupplierPayments(prev => prev.map(p => p.id === tempId ? { ...p, id: docRef.id, documentUrl: finalDocumentUrl, documentUploadStatus: 'completed' } : p));
+        } else {
+             // Save to Firestore without document
+            const docRef = await addDoc(collection(db, 'users', currentUser.uid, 'supplierPayments'), { ...payment, date: Timestamp.fromDate(payment.date) });
+            // Update optimistic UI with final data
+            setSupplierPayments(prev => prev.map(p => p.id === tempId ? { ...p, id: docRef.id, documentUploadStatus: 'none' } : p));
         }
     } catch (error) {
         console.error("Error saving payment:", error);
-        setSupplierPayments(prev => prev.filter(p => p.id !== tempPaymentId));
+        // Revert optimistic update
+        setSupplierPayments(prev => prev.filter(p => p.id !== tempId));
         toast({ title: "خطأ", description: "فشل حفظ الدفعة. يرجى المحاولة مرة أخرى.", variant: "destructive" });
         throw error;
     }
@@ -429,20 +454,27 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', id);
 
     try {
+        const originalPayment = supplierPayments.find(p => p.id === id);
+        if (!originalPayment) throw new Error("Payment not found");
+
         const optimisticPayment = { 
             ...updatedPayment, 
-            documentUploadStatus: documentFile ? 'uploading' : updatedPayment.documentUploadStatus 
+            documentUrl: documentFile ? URL.createObjectURL(documentFile) : updatedPayment.documentUrl,
+            documentUploadStatus: documentFile ? 'uploading' : updatedPayment.documentUploadStatus,
         };
-        setSupplierPayments(prev => prev.map(p => p.id === id ? optimisticPayment : p)
-            .sort((a, b) => b.date.getTime() - a.date.getTime()));
-
+        setSupplierPayments(prev => prev.map(p => p.id === id ? optimisticPayment : p).sort((a, b) => b.date.getTime() - a.date.getTime()));
+        
         let newDocumentUrl = dataToUpdate.documentUrl;
 
         if (documentFile) {
-            // Delete old file first if it exists
-            if (dataToUpdate.documentUrl) {
+            const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${id}/${documentFile.name}`);
+            await uploadBytes(fileRef, documentFile);
+            newDocumentUrl = await getDownloadURL(fileRef);
+            
+            // Delete old file if it exists and is different
+            if (originalPayment.documentUrl && originalPayment.documentUrl !== newDocumentUrl) {
                 try {
-                    const oldFileRef = storageRef(storage, dataToUpdate.documentUrl);
+                    const oldFileRef = storageRef(storage, originalPayment.documentUrl);
                     await deleteObject(oldFileRef);
                 } catch (storageError: any) {
                     if (storageError.code !== 'storage/object-not-found') {
@@ -450,24 +482,19 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
                     }
                 }
             }
-            // Upload new file in background
-            handleBackgroundUpload(id, documentFile, currentUser.uid);
-            newDocumentUrl = ''; // It will be updated by the background upload
         }
-
+        
         const finalData = { 
             ...dataToUpdate, 
             date: Timestamp.fromDate(dataToUpdate.date),
-            documentUrl: newDocumentUrl,
-            documentUploadStatus: documentFile ? 'uploading' : dataToUpdate.documentUploadStatus
+            documentUrl: newDocumentUrl
         };
-
         await updateDoc(paymentDocRef, finalData as any);
-        // UI is already updated optimistically
+
+        setSupplierPayments(prev => prev.map(p => p.id === id ? { ...updatedPayment, documentUrl: newDocumentUrl, documentUploadStatus: 'completed' } : p));
 
     } catch (error) {
         console.error("Error updating supplier payment:", error);
-        // Revert optimistic update on failure
         setSupplierPayments(prev => prev.map(p => p.id === id ? { ...updatedPayment, documentUploadStatus: 'failed' } : p));
         toast({ title: "خطأ", description: "فشل تحديث الدفعة.", variant: "destructive" });
         throw error;
@@ -477,26 +504,29 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const deleteSupplierPayment = async (paymentId: string) => {
     if (!currentUser) return;
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', paymentId);
+    
+    // Optimistic delete
+    const paymentToDelete = supplierPayments.find(p => p.id === paymentId);
+    if (!paymentToDelete) return;
+    setSupplierPayments(prev => prev.filter(p => p.id !== paymentId));
+
     try {
-      const docSnap = await getDoc(paymentDocRef);
-      if (docSnap.exists()) {
-        const paymentData = docSnap.data() as SupplierPayment;
-        if (paymentData.documentUrl) {
-          try {
-            const fileRef = storageRef(storage, paymentData.documentUrl);
-            await deleteObject(fileRef);
-          } catch(storageError: any) {
-             if (storageError.code !== 'storage/object-not-found') {
-                console.error("Could not delete file from storage, proceeding with DB delete.", storageError);
-             }
-          }
+      if (paymentToDelete.documentUrl) {
+        try {
+          const fileRef = storageRef(storage, paymentToDelete.documentUrl);
+          await deleteObject(fileRef);
+        } catch(storageError: any) {
+           if (storageError.code !== 'storage/object-not-found') {
+              console.error("Could not delete file from storage, proceeding with DB delete.", storageError);
+              toast({ title: "تحذير", description: "لم يتمكن من حذف الملف المرفق، لكن تم حذف السجل." });
+           }
         }
       }
-
       await deleteDoc(paymentDocRef);
-      setSupplierPayments(prev => prev.filter(p => p.id !== paymentId));
       toast({ title: "تم الحذف", description: "تم حذف الدفعة بنجاح." });
     } catch (error) {
+      // Revert optimistic delete on error
+      setSupplierPayments(prev => [...prev, paymentToDelete].sort((a,b)=>b.date.getTime() - a.date.getTime()));
       console.error("Error deleting supplier payment: ", error);
       toast({ title: "خطأ", description: "لم نتمكن من حذف الدفعة.", variant: "destructive" });
     }
@@ -509,6 +539,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       expenses, addExpense, updateExpense, deleteExpense,
       balanceTransfers, addBalanceTransfer, updateBalanceTransfer, deleteBalanceTransfer,
       supplierPayments, addSupplierPayment, updateSupplierPayment, deleteSupplierPayment,
+      supplierNames,
       loading 
     }}>
       {children}
