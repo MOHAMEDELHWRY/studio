@@ -409,9 +409,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
           ...payment,
           date: Timestamp.fromDate(payment.date),
           documentUrl: documentUrl,
-          documentUploadStatus: documentFile ? 'completed' : 'none'
       };
-
+      
+      // Use setDoc instead of addDoc because we already have the ref
       await setDoc(paymentDocRef, paymentData);
       
       // Update UI with final state
@@ -420,8 +420,10 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       ));
     } catch (error) {
       console.error("Error saving payment:", error);
-      // Revert optimistic UI update on failure
-      setSupplierPayments(prev => prev.filter(p => p.id !== paymentId));
+      // Update UI to show failure
+       setSupplierPayments(prev => prev.map(p => 
+        p.id === paymentId ? { ...p, documentUploadStatus: 'failed' } : p
+      ));
       toast({ title: "خطأ", description: "فشل حفظ الدفعة. يرجى المحاولة مرة أخرى.", variant: "destructive" });
       throw error;
     }
@@ -434,8 +436,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
 
     try {
         const originalPaymentDoc = await getDoc(paymentDocRef);
-        const originalPayment = originalPaymentDoc.data() as SupplierPayment | undefined;
-        if (!originalPayment) throw new Error("Payment not found");
+        const originalPaymentData = originalPaymentDoc.data() as SupplierPayment | undefined;
 
         setSupplierPayments(prev => prev.map(p => 
             p.id === id ? { ...updatedPayment, documentUploadStatus: documentFile ? 'uploading' : p.documentUploadStatus } : p
@@ -448,9 +449,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
             await uploadBytes(fileRef, documentFile);
             newDocumentUrl = await getDownloadURL(fileRef);
             
-            if (originalPayment.documentUrl && originalPayment.documentUrl !== newDocumentUrl) {
+            if (originalPaymentData?.documentUrl && originalPaymentData.documentUrl !== newDocumentUrl) {
                 try {
-                    const oldFileRef = storageRef(storage, originalPayment.documentUrl);
+                    const oldFileRef = storageRef(storage, originalPaymentData.documentUrl);
                     await deleteObject(oldFileRef);
                 } catch (storageError: any) {
                     if (storageError.code !== 'storage/object-not-found') {
@@ -464,8 +465,10 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
             ...dataToUpdate, 
             date: Timestamp.fromDate(dataToUpdate.date),
             documentUrl: newDocumentUrl,
-            documentUploadStatus: documentFile ? 'completed' : dataToUpdate.documentUploadStatus
         };
+        // Remove the local status tracker before updating Firestore
+        delete (finalData as any).documentUploadStatus;
+
         await updateDoc(paymentDocRef, finalData as any);
 
         setSupplierPayments(prev => prev.map(p => 
@@ -484,12 +487,15 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     if (!currentUser) return;
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', paymentId);
     
+    // Find payment to get documentUrl before removing it from state
     const paymentToDelete = supplierPayments.find(p => p.id === paymentId);
     if (!paymentToDelete) return;
 
+    // Optimistic UI update
     setSupplierPayments(prev => prev.filter(p => p.id !== paymentId));
 
     try {
+      // Delete the document from storage if it exists
       if (paymentToDelete.documentUrl) {
         try {
           const fileRef = storageRef(storage, paymentToDelete.documentUrl);
@@ -501,9 +507,11 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
            }
         }
       }
+      // Delete the document from Firestore
       await deleteDoc(paymentDocRef);
       toast({ title: "تم الحذف", description: "تم حذف الدفعة بنجاح." });
     } catch (error) {
+      // Revert UI update on failure
       setSupplierPayments(prev => [...prev, paymentToDelete].sort((a,b)=>b.date.getTime() - a.date.getTime()));
       console.error("Error deleting supplier payment: ", error);
       toast({ title: "خطأ", description: "لم نتمكن من حذف الدفعة.", variant: "destructive" });

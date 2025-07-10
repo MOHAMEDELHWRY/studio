@@ -2,9 +2,9 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow users to read and write to their own 'transfers' folder.
-    // The path must match the structure created in the application code.
-    match /users/{userId}/transfers/{paymentId}/{fileName} {
+    // Allow users to read and write to their own files within the 'transfers' subdirectory.
+    // The path must exactly match the structure used in the application code.
+    match /users/{userId}/transfers/{paymentId}/{allPaths=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }

@@ -25,5 +25,4 @@ const storage = getStorage(app);
 storage.maxUploadRetryTime = 300000; // 5 minutes
 storage.maxOperationRetryTime = 300000; // 5 minutes
 
-
 export { app, db, auth, storage };
