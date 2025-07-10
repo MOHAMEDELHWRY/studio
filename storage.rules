@@ -2,9 +2,7 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // This rule allows any authenticated user to read and write files
-    // within their own user-specific directory. The {userId} wildcard
-    // ensures that a user can only access files under their own UID path.
+    // Allow users to read and write to their own folder.
     match /users/{userId}/{allPaths=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
