@@ -21,7 +21,9 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 
-storage.maxUploadRetryTime = 300000;
-storage.maxOperationRetryTime = 300000;
+// Increase the maximum retry time for uploads to handle larger files or slower networks
+storage.maxUploadRetryTime = 300000; // 5 minutes
+storage.maxOperationRetryTime = 300000; // 5 minutes
+
 
 export { app, db, auth, storage };
