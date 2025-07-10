@@ -149,8 +149,7 @@ export default function PaymentsReportPage() {
         const { document, ...restOfValues } = values;
 
         if (editingPayment) {
-            const updatedPaymentData: SupplierPayment = { ...editingPayment, ...restOfValues, documentUrl: editingPayment.documentUrl, documentUploadStatus: editingPayment.documentUploadStatus };
-            await updateSupplierPayment(updatedPaymentData, documentFile);
+            await updateSupplierPayment({ ...editingPayment, ...restOfValues }, documentFile);
             toast({ title: "نجاح", description: "تم تعديل الدفعة بنجاح." });
         } else {
             const newPaymentData: Omit<SupplierPayment, 'id' | 'documentUrl'> = { ...restOfValues };
@@ -318,10 +317,10 @@ export default function PaymentsReportPage() {
                   <DialogFooter className="pt-4">
                      <DialogClose asChild>
                       <Button type="button" variant="secondary">إلغاء</Button>
-                    </DialogClose>
-                    <Button type="submit" disabled={isSubmitting}>
+                     </DialogClose>
+                     <Button type="submit" disabled={isSubmitting}>
                         {isSubmitting ? 'جاري الحفظ...' : (editingPayment ? 'حفظ التعديلات' : 'تسجيل الدفعة')}
-                    </Button>
+                     </Button>
                   </DialogFooter>
                 </form>
               </Form>
