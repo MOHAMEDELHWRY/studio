@@ -15,7 +15,8 @@ import {
   query,
   where,
   writeBatch,
-  setDoc
+  setDoc,
+  Timestamp
 } from 'firebase/firestore';
 import { 
   ref as storageRef, 
@@ -59,6 +60,33 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const handleBackgroundUpload = async (paymentId: string, documentFile: File, userId: string) => {
+      let fileRef: StorageReference | null = null;
+      try {
+        fileRef = storageRef(storage, `users/${userId}/supplierPayments/${paymentId}/${documentFile.name}`);
+        await uploadBytes(fileRef, documentFile);
+        const documentUrl = await getDownloadURL(fileRef);
+
+        const paymentDocRef = doc(db, 'users', userId, 'supplierPayments', paymentId);
+        await updateDoc(paymentDocRef, { documentUrl, documentUploadStatus: 'completed' });
+        
+        // Update local state
+        setSupplierPayments(prev => 
+            prev.map(p => p.id === paymentId ? { ...p, documentUrl, documentUploadStatus: 'completed' } : p)
+        );
+
+      } catch (error) {
+        console.error("Background upload failed:", error);
+        const paymentDocRef = doc(db, 'users', userId, 'supplierPayments', paymentId);
+        await updateDoc(paymentDocRef, { documentUploadStatus: 'failed' });
+         // Update local state
+         setSupplierPayments(prev => 
+            prev.map(p => p.id === paymentId ? { ...p, documentUploadStatus: 'failed' } : p)
+        );
+      }
+  };
+
+
   useEffect(() => {
     const fetchData = async () => {
       if (!currentUser) {
@@ -80,12 +108,16 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         const transactionSnapshot = await getDocs(transactionsCollectionRef);
         const fetchedTransactions = transactionSnapshot.docs.map(doc => {
           const data = doc.data();
+          const date = data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date);
+          const executionDate = data.executionDate ? (data.executionDate instanceof Timestamp ? data.executionDate.toDate() : new Date(data.executionDate)) : undefined;
+          const dueDate = data.dueDate ? (data.dueDate instanceof Timestamp ? data.dueDate.toDate() : new Date(data.dueDate)) : undefined;
+          
           return {
             ...data,
             id: doc.id,
-            date: new Date(data.date),
-            executionDate: data.executionDate ? new Date(data.executionDate) : undefined,
-            dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+            date,
+            executionDate,
+            dueDate,
           } as Transaction;
         });
         setTransactions(fetchedTransactions.sort((a, b) => b.date.getTime() - a.date.getTime()));
@@ -94,10 +126,11 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         const expenseSnapshot = await getDocs(expensesCollectionRef);
         const fetchedExpenses = expenseSnapshot.docs.map(doc => {
           const data = doc.data();
+          const date = data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date);
           return {
             ...data,
             id: doc.id,
-            date: new Date(data.date),
+            date,
           } as Expense;
         });
         setExpenses(fetchedExpenses.sort((a, b) => b.date.getTime() - a.date.getTime()));
@@ -106,10 +139,11 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         const transferSnapshot = await getDocs(balanceTransfersCollectionRef);
         const fetchedTransfers = transferSnapshot.docs.map(doc => {
           const data = doc.data();
+          const date = data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date);
           return {
             ...data,
             id: doc.id,
-            date: new Date(data.date),
+            date,
             classification: data.classification || 'تحويل عام',
           } as BalanceTransfer;
         });
@@ -129,11 +163,13 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
               classification = 'دفعة من رصيد المبيعات';
             }
           }
+          
+          const date = data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date);
 
           return {
             ...data,
             id: doc.id,
-            date: new Date(data.date),
+            date,
             classification: classification || 'دفعة من رصيد المبيعات', // Default for very old data
           } as SupplierPayment;
         });
@@ -158,11 +194,11 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const transactionsCollectionRef = collection(db, 'users', currentUser.uid, 'transactions');
       const docData = {
         ...transaction,
-        date: transaction.date.toISOString(),
-        executionDate: transaction.executionDate?.toISOString() || null,
-        dueDate: transaction.dueDate?.toISOString() || null,
+        date: Timestamp.fromDate(transaction.date),
+        executionDate: transaction.executionDate ? Timestamp.fromDate(transaction.executionDate) : null,
+        dueDate: transaction.dueDate ? Timestamp.fromDate(transaction.dueDate) : null,
       };
-      const docRef = await addDoc(transactionsCollectionRef, docData);
+      const docRef = await addDoc(transactionsCollectionRef, docData as any);
       setTransactions(prev => [{ ...transaction, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
     } catch (error) {
       console.error("Error adding transaction: ", error);
@@ -177,9 +213,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const transactionDoc = doc(db, 'users', currentUser.uid, 'transactions', id);
       const docData = {
         ...dataToUpdate,
-        date: updatedTransaction.date.toISOString(),
-        executionDate: updatedTransaction.executionDate?.toISOString() || null,
-        dueDate: updatedTransaction.dueDate?.toISOString() || null,
+        date: Timestamp.fromDate(updatedTransaction.date),
+        executionDate: updatedTransaction.executionDate ? Timestamp.fromDate(updatedTransaction.executionDate) : null,
+        dueDate: updatedTransaction.dueDate ? Timestamp.fromDate(updatedTransaction.dueDate) : null,
       };
       await updateDoc(transactionDoc, docData as any);
       setTransactions(prev => 
@@ -241,9 +277,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const expensesCollectionRef = collection(db, 'users', currentUser.uid, 'expenses');
       const docData = {
         ...expense,
-        date: expense.date.toISOString(),
+        date: Timestamp.fromDate(expense.date),
       };
-      const docRef = await addDoc(expensesCollectionRef, docData);
+      const docRef = await addDoc(expensesCollectionRef, docData as any);
       setExpenses(prev => [{...expense, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
     } catch (error) {
       console.error("Error adding expense: ", error);
@@ -258,7 +294,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const expenseDoc = doc(db, 'users', currentUser.uid, 'expenses', id);
       const docData = {
         ...dataToUpdate,
-        date: updatedExpense.date.toISOString(),
+        date: Timestamp.fromDate(updatedExpense.date),
       };
       await updateDoc(expenseDoc, docData);
       setExpenses(prev => 
@@ -294,9 +330,9 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const transfersCollectionRef = collection(db, 'users', currentUser.uid, 'balanceTransfers');
       const docData = {
         ...transfer,
-        date: transfer.date.toISOString(),
+        date: Timestamp.fromDate(transfer.date),
       };
-      const docRef = await addDoc(transfersCollectionRef, docData);
+      const docRef = await addDoc(transfersCollectionRef, docData as any);
       setBalanceTransfers(prev => [{ ...transfer, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
     } catch (error) {
       console.error("Error adding balance transfer: ", error);
@@ -311,7 +347,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const transferDoc = doc(db, 'users', currentUser.uid, 'balanceTransfers', id);
       const docData = {
         ...dataToUpdate,
-        date: updatedTransfer.date.toISOString(),
+        date: Timestamp.fromDate(updatedTransfer.date),
       };
       await updateDoc(transferDoc, docData);
       setBalanceTransfers(prev =>
@@ -345,36 +381,34 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     if (!currentUser) throw new Error("User not authenticated");
     
     const newPaymentRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
-    let fileRef: StorageReference | null = null;
-  
+    
+    const newPaymentData: Omit<SupplierPayment, 'id'> = {
+      ...payment,
+      date: payment.date,
+      documentUrl: '',
+      documentUploadStatus: documentFile ? 'uploading' : 'none'
+    };
+
+    const finalPayment: SupplierPayment = { ...newPaymentData, id: newPaymentRef.id };
+    
+    // Optimistically update UI
+    setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
+
     try {
-      let documentUrl = '';
+      const docData = {
+        ...newPaymentData,
+        date: Timestamp.fromDate(newPaymentData.date),
+      }
+      await setDoc(newPaymentRef, docData);
+
       if (documentFile) {
-        fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${newPaymentRef.id}/${documentFile.name}`);
-        await uploadBytes(fileRef, documentFile);
-        documentUrl = await getDownloadURL(fileRef);
+        handleBackgroundUpload(newPaymentRef.id, documentFile, currentUser.uid);
       }
-  
-      const newPaymentData = {
-        ...payment,
-        date: payment.date.toISOString(),
-        documentUrl,
-      };
-  
-      await setDoc(newPaymentRef, newPaymentData);
-  
-      const finalPayment: SupplierPayment = { ...payment, id: newPaymentRef.id, documentUrl };
-      setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
-    } catch (error) {
-      console.error("Error adding supplier payment: ", error);
-      if (fileRef) {
-        try {
-          await deleteObject(fileRef);
-        } catch (cleanupError) {
-          console.error("Failed to cleanup orphaned file after failed DB write.", cleanupError);
-        }
-      }
-      throw error;
+    } catch(error) {
+      console.error("Error adding supplier payment doc:", error);
+      // Revert optimistic update
+      setSupplierPayments(prev => prev.filter(p => p.id !== newPaymentRef.id));
+      throw error; // Rethrow to be caught in the form handler
     }
   };
 
@@ -383,52 +417,45 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     const { id, ...dataToUpdate } = updatedPayment;
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', id);
 
-    let newFileRef: StorageReference | null = null;
-    let newDocumentUrl: string | null = null;
-
     try {
         const docSnap = await getDoc(paymentDocRef);
-        if (!docSnap.exists()) {
-            throw new Error("Payment document to update not found.");
-        }
-        const oldDocumentUrl = (docSnap.data() as SupplierPayment).documentUrl;
+        if (!docSnap.exists()) throw new Error("Payment document to update not found.");
         
-        let finalDocumentUrl = oldDocumentUrl;
+        const oldDocumentUrl = docSnap.data()?.documentUrl;
+        
+        const finalData = { 
+            ...dataToUpdate, 
+            date: Timestamp.fromDate(dataToUpdate.date),
+            documentUrl: oldDocumentUrl, // Keep old URL for now
+            documentUploadStatus: documentFile ? 'uploading' : dataToUpdate.documentUploadStatus
+        };
+
+        // Optimistically update UI
+        setSupplierPayments(prev => prev.map(p => p.id === id ? { ...updatedPayment, documentUploadStatus: finalData.documentUploadStatus } : p)
+          .sort((a, b) => b.date.getTime() - a.date.getTime())
+        );
+
+        await updateDoc(paymentDocRef, finalData as any);
 
         if (documentFile) {
-            newFileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${id}/${documentFile.name}`);
-            await uploadBytes(newFileRef, documentFile);
-            newDocumentUrl = await getDownloadURL(newFileRef);
-            finalDocumentUrl = newDocumentUrl;
-        }
-        
-        const docData = { ...dataToUpdate, date: updatedPayment.date.toISOString(), documentUrl: finalDocumentUrl };
-        await updateDoc(paymentDocRef, docData as any);
-        
-        if (newDocumentUrl && oldDocumentUrl && oldDocumentUrl !== newDocumentUrl) {
-            try {
-                const oldFileRef = storageRef(storage, oldDocumentUrl);
-                await deleteObject(oldFileRef);
-            } catch (storageError: any) {
-                if (storageError.code !== 'storage/object-not-found') {
-                    console.warn("Could not delete old file, but update was successful.", storageError);
+            if (oldDocumentUrl) {
+                try {
+                    const oldFileRef = storageRef(storage, oldDocumentUrl);
+                    await deleteObject(oldFileRef);
+                } catch (storageError: any) {
+                    if (storageError.code !== 'storage/object-not-found') {
+                        console.warn("Could not delete old file, but proceeding with new upload.", storageError);
+                    }
                 }
             }
+            // Start background upload for the new file
+            handleBackgroundUpload(id, documentFile, currentUser.uid);
         }
-        
-        const finalUpdatedPayment: SupplierPayment = { ...updatedPayment, documentUrl: finalDocumentUrl };
-        setSupplierPayments(prev =>
-            prev.map(p => (p.id === id ? finalUpdatedPayment : p)).sort((a, b) => b.date.getTime() - a.date.getTime())
-        );
+
     } catch (error) {
         console.error("Error updating supplier payment: ", error);
-        if (newFileRef) {
-            try {
-                await deleteObject(newFileRef);
-            } catch (cleanupError) {
-                console.error("Failed to cleanup orphaned file after failed DB update.", cleanupError);
-            }
-        }
+        // Optionally revert UI state on error
+        setSupplierPayments(prev => prev);
         throw error;
     }
   };

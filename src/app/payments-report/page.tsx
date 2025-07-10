@@ -19,7 +19,9 @@ import {
   Hash,
   DollarSign,
   File as FileIcon,
-  Plus
+  Plus,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -59,6 +61,7 @@ import {
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const paymentSchema = z.object({
   date: z.date({ required_error: "التاريخ مطلوب." }),
@@ -146,7 +149,7 @@ export default function PaymentsReportPage() {
         const { document, ...restOfValues } = values;
 
         if (editingPayment) {
-            const updatedPaymentData: SupplierPayment = { ...editingPayment, ...restOfValues, documentUrl: editingPayment.documentUrl };
+            const updatedPaymentData: SupplierPayment = { ...editingPayment, ...restOfValues, documentUrl: editingPayment.documentUrl, documentUploadStatus: editingPayment.documentUploadStatus };
             await updateSupplierPayment(updatedPaymentData, documentFile);
             toast({ title: "نجاح", description: "تم تعديل الدفعة بنجاح." });
         } else {
@@ -180,6 +183,48 @@ export default function PaymentsReportPage() {
   const sortedPayments = useMemo(() => {
     return [...supplierPayments].sort((a,b) => b.date.getTime() - a.date.getTime());
   }, [supplierPayments]);
+
+  const renderDocumentCell = (payment: SupplierPayment) => {
+    if (payment.documentUploadStatus === 'uploading') {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>جاري رفع المستند...</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (payment.documentUploadStatus === 'failed') {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <AlertCircle className="w-4 h-4 text-destructive" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>فشل رفع المستند. يرجى التعديل والمحاولة مرة أخرى.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    
+    if (payment.documentUrl) {
+      return (
+        <Button asChild variant="link" className="p-0 h-auto">
+          <a href={payment.documentUrl} target="_blank" rel="noopener noreferrer"><FileIcon className="w-4 h-4" /></a>
+        </Button>
+      );
+    }
+
+    return '-';
+  }
 
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -304,7 +349,7 @@ export default function PaymentsReportPage() {
                       <TableCell>{p.classification}</TableCell>
                       <TableCell>{p.reason}</TableCell>
                       <TableCell>{p.responsiblePerson}</TableCell>
-                      <TableCell>{p.documentUrl ? (<Button asChild variant="link" className="p-0 h-auto"><a href={p.documentUrl} target="_blank" rel="noopener noreferrer"><FileIcon className="w-4 h-4" /></a></Button>) : ('-')}</TableCell>
+                      <TableCell>{renderDocumentCell(p)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(p)} className="text-muted-foreground hover:text-primary">
