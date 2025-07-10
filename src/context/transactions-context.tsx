@@ -409,7 +409,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
 
     setSupplierPayments(prev => [...prev, finalPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
 
-    const docData = { ...payment, date: Timestamp.fromDate(payment.date) };
+    const docData = { ...payment, date: Timestamp.fromDate(payment.date), documentUploadStatus: dataToSave.documentUploadStatus };
     try {
         await setDoc(paymentDocRef, docData);
         if (documentFile) {
@@ -429,13 +429,6 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', id);
 
     try {
-        const docSnap = await getDoc(paymentDocRef);
-        if (!docSnap.exists()) {
-            throw new Error("Payment document not found.");
-        }
-        const oldDocumentUrl = docSnap.data().documentUrl;
-        
-        // Optimistically update UI
         const optimisticPayment = { 
             ...updatedPayment, 
             documentUploadStatus: documentFile ? 'uploading' : updatedPayment.documentUploadStatus 
@@ -443,14 +436,13 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         setSupplierPayments(prev => prev.map(p => p.id === id ? optimisticPayment : p)
             .sort((a, b) => b.date.getTime() - a.date.getTime()));
 
-
-        let newDocumentUrl = oldDocumentUrl;
+        let newDocumentUrl = dataToUpdate.documentUrl;
 
         if (documentFile) {
             // Delete old file first if it exists
-            if (oldDocumentUrl) {
+            if (dataToUpdate.documentUrl) {
                 try {
-                    const oldFileRef = storageRef(storage, oldDocumentUrl);
+                    const oldFileRef = storageRef(storage, dataToUpdate.documentUrl);
                     await deleteObject(oldFileRef);
                 } catch (storageError: any) {
                     if (storageError.code !== 'storage/object-not-found') {
@@ -458,23 +450,20 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
                     }
                 }
             }
-            // Upload new file
-            const fileRef = storageRef(storage, `users/${currentUser.uid}/supplierPayments/${id}/${documentFile.name}`);
-            await uploadBytes(fileRef, documentFile);
-            newDocumentUrl = await getDownloadURL(fileRef);
+            // Upload new file in background
+            handleBackgroundUpload(id, documentFile, currentUser.uid);
+            newDocumentUrl = ''; // It will be updated by the background upload
         }
 
         const finalData = { 
             ...dataToUpdate, 
             date: Timestamp.fromDate(dataToUpdate.date),
             documentUrl: newDocumentUrl,
-            documentUploadStatus: documentFile ? 'completed' : dataToUpdate.documentUploadStatus
+            documentUploadStatus: documentFile ? 'uploading' : dataToUpdate.documentUploadStatus
         };
 
         await updateDoc(paymentDocRef, finalData as any);
-        // Final UI update with completed status
-        setSupplierPayments(prev => prev.map(p => p.id === id ? { ...updatedPayment, documentUrl: newDocumentUrl, documentUploadStatus: finalData.documentUploadStatus } : p)
-            .sort((a, b) => b.date.getTime() - a.date.getTime()));
+        // UI is already updated optimistically
 
     } catch (error) {
         console.error("Error updating supplier payment:", error);
