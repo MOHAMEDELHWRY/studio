@@ -22,7 +22,8 @@ import {
   Paperclip,
   File as FileIcon,
   X,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -66,7 +67,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
 
-
+// We make documentUrl optional in the form, but required in the type
 const paymentSchema = z.object({
   date: z.date({ required_error: "التاريخ مطلوب." }),
   amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
@@ -77,7 +78,7 @@ const paymentSchema = z.object({
   destinationBank: z.string().optional(),
   reason: z.string().trim().min(1, "يجب كتابة سبب الصرف."),
   responsiblePerson: z.string().trim().min(1, "يجب تحديد القائم بالتحويل."),
-  document: z.any().optional(),
+  documentUrl: z.string().optional(), // This will be handled separately
 });
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
@@ -92,6 +93,7 @@ export default function PaymentsReportPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [existingDocumentUrl, setExistingDocumentUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
 
   const supplierNames = useMemo(() => {
@@ -117,6 +119,7 @@ export default function PaymentsReportPage() {
   const handleOpenDialog = (payment: SupplierPayment | null) => {
     setEditingPayment(payment);
     setSelectedFile(null);
+    setUploadError(null);
 
     if (payment) {
       form.reset({
@@ -124,6 +127,7 @@ export default function PaymentsReportPage() {
           date: new Date(payment.date),
           sourceBank: payment.sourceBank ?? "",
           destinationBank: payment.destinationBank ?? "",
+          documentUrl: payment.documentUrl,
       });
       setExistingDocumentUrl(payment.documentUrl || null);
     } else {
@@ -145,22 +149,41 @@ export default function PaymentsReportPage() {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    setUploadError(null);
     if (file) {
       if (file.size > MAX_FILE_SIZE) {
+        setUploadError("حجم الملف يتجاوز 5 ميجابايت.");
         toast({ title: "خطأ", description: "حجم الملف يتجاوز 5 ميجابايت.", variant: "destructive"});
+        setSelectedFile(null);
         return;
       }
       if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+        setUploadError("نوع الملف غير مدعوم. يرجى رفع صورة أو ملف PDF.");
         toast({ title: "خطأ", description: "نوع الملف غير مدعوم. يرجى رفع صورة أو ملف PDF.", variant: "destructive"});
+        setSelectedFile(null);
         return;
       }
       setSelectedFile(file);
       setExistingDocumentUrl(null); // Clear existing doc if new one is selected
+      form.setValue('documentUrl', undefined); // Clear the form value as well
     }
   };
 
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if(fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveExistingFile = () => {
+      setExistingDocumentUrl(null);
+      form.setValue('documentUrl', undefined);
+  }
+
   const onSubmit = async (values: PaymentFormValues) => {
     setIsSubmitting(true);
+    setUploadError(null);
     try {
         if (editingPayment) {
             await updateSupplierPayment(editingPayment, values, selectedFile);
@@ -171,11 +194,13 @@ export default function PaymentsReportPage() {
         }
 
         form.reset();
+        setSelectedFile(null);
         setIsDialogOpen(false);
         setEditingPayment(null);
-    } catch(error) {
+    } catch(error: any) {
         console.error("Failed to submit payment:", error);
-        toast({ title: "خطأ", description: "فشل حفظ الدفعة. يرجى المحاولة مرة أخرى.", variant: "destructive" });
+        setUploadError(`فشل حفظ الدفعة: ${error.message}`);
+        toast({ title: "خطأ", description: `فشل حفظ الدفعة. ${error.message}`, variant: "destructive" });
     } finally {
         setIsSubmitting(false);
     }
@@ -203,7 +228,7 @@ export default function PaymentsReportPage() {
             <SidebarTrigger />
             <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
               <Landmark className="w-8 h-8" />
-              تقرير سجل الدفعات
+              سجل الدفعات
             </h1>
         </div>
         <Button onClick={() => handleOpenDialog(null)}>
@@ -257,40 +282,53 @@ export default function PaymentsReportPage() {
 
                   <FormItem>
                     <FormLabel>مستند التحويل (اختياري)</FormLabel>
-                    {isSubmitting && selectedFile ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground p-2 border rounded-md">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>جاري رفع: {selectedFile.name}</span>
-                      </div>
-                    ) : selectedFile ? (
-                       <div className="flex items-center justify-between gap-2 text-sm text-primary p-2 border border-dashed rounded-md">
-                          <div className="flex items-center gap-2">
-                             <FileIcon className="h-5 w-5" />
-                             <span className="font-medium truncate">{selectedFile.name}</span>
+                    <div className='flex flex-col gap-2'>
+                        {isSubmitting && selectedFile && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground p-2 border rounded-md">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>جاري رفع: {selectedFile.name}</span>
+                            </div>
+                        )}
+                        {uploadError && (
+                             <div className="flex items-center gap-2 text-sm text-destructive p-2 border border-destructive/50 rounded-md">
+                                <AlertCircle className="h-4 w-4" />
+                                <span>{uploadError}</span>
+                            </div>
+                        )}
+                        {selectedFile && !isSubmitting && (
+                           <div className="flex items-center justify-between gap-2 text-sm text-primary p-2 border border-dashed rounded-md">
+                              <div className="flex items-center gap-2">
+                                 <FileIcon className="h-5 w-5" />
+                                 <span className="font-medium truncate">{selectedFile.name}</span>
+                              </div>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleRemoveFile}>
+                                <X className="h-4 w-4" />
+                                <span className="sr-only">إزالة الملف</span>
+                              </Button>
                           </div>
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedFile(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                      </div>
-                    ) : existingDocumentUrl ? (
-                      <div className="flex items-center justify-between gap-2 text-sm text-primary p-2 border border-dashed rounded-md">
-                          <a href={existingDocumentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
-                             <Paperclip className="h-5 w-5" />
-                             <span className="font-medium truncate">عرض المستند الحالي</span>
-                          </a>
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setExistingDocumentUrl(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                      </div>
-                    ) : (
-                      <FormControl>
-                          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full">
-                              <Paperclip className="ml-2 h-4 w-4" />
-                              اختر ملفًا (صورة أو PDF، بحد أقصى 5 ميجا)
-                              <Input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept="image/*,.pdf" />
-                          </Button>
-                      </FormControl>
-                    )}
+                        )}
+                        {existingDocumentUrl && (
+                          <div className="flex items-center justify-between gap-2 text-sm text-primary p-2 border border-dashed rounded-md">
+                              <a href={existingDocumentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
+                                 <Paperclip className="h-5 w-5" />
+                                 <span className="font-medium truncate">عرض المستند الحالي</span>
+                              </a>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleRemoveExistingFile}>
+                                <X className="h-4 w-4" />
+                                <span className="sr-only">إزالة المستند</span>
+                              </Button>
+                          </div>
+                        )}
+                        {!selectedFile && !existingDocumentUrl && (
+                          <FormControl>
+                              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full">
+                                  <Paperclip className="ml-2 h-4 w-4" />
+                                  اختر ملفًا (صورة أو PDF، بحد أقصى 5 ميجا)
+                                  <Input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept="image/*,.pdf" />
+                              </Button>
+                          </FormControl>
+                        )}
+                    </div>
                     <FormMessage />
                   </FormItem>
 

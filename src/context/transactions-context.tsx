@@ -42,8 +42,8 @@ interface TransactionsContextType {
   updateBalanceTransfer: (updatedTransfer: BalanceTransfer) => Promise<void>;
   deleteBalanceTransfer: (transferId: string) => Promise<void>;
   supplierPayments: SupplierPayment[];
-  addSupplierPayment: (paymentData: Omit<SupplierPayment, 'id'>, file?: File | null) => Promise<void>;
-  updateSupplierPayment: (existingPayment: SupplierPayment, paymentData: Omit<SupplierPayment, 'id'>, file?: File | null) => Promise<void>;
+  addSupplierPayment: (paymentData: Omit<SupplierPayment, 'id' | 'documentUrl' | 'documentPath'>, file?: File | null) => Promise<void>;
+  updateSupplierPayment: (existingPayment: SupplierPayment, paymentData: Omit<SupplierPayment, 'id' | 'documentUrl' | 'documentPath'>, file?: File | null) => Promise<void>;
   deleteSupplierPayment: (payment: SupplierPayment) => Promise<void>;
   supplierNames: string[];
   loading: boolean;
@@ -135,23 +135,13 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         const paymentSnapshot = await getDocs(supplierPaymentsCollectionRef);
         const fetchedPayments = paymentSnapshot.docs.map(doc => {
           const data = doc.data() as any;
-          let classification = data.classification;
-
-          if (!classification && data.deductFrom) {
-            if (data.deductFrom === 'رصيد المصنع') {
-              classification = 'سداد للمصنع عن المورد';
-            } else { 
-              classification = 'دفعة من رصيد المبيعات';
-            }
-          }
-          
           const date = data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date);
 
           return {
             ...data,
             id: doc.id,
             date,
-            classification: classification || 'دفعة من رصيد المبيعات', 
+            classification: data.classification || 'دفعة من رصيد المبيعات', 
           } as SupplierPayment;
         });
         setSupplierPayments(fetchedPayments.sort((a, b) => b.date.getTime() - a.date.getTime()));
@@ -316,7 +306,6 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       const docRef = await addDoc(transfersCollectionRef, docData as any);
       setBalanceTransfers(prev => [{ ...transfer, id: docRef.id }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
       
-      // If transfer is an expense, add it to expenses too
       if (transfer.fromAccount === 'profit_expense') {
         const expenseData: Omit<Expense, 'id'> = {
           date: transfer.date,
@@ -365,9 +354,6 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       setBalanceTransfers(prev => prev.filter(t => t.id !== transferId));
 
       if (transferData.fromAccount === 'profit_expense') {
-        // This is tricky. We need to find and delete the corresponding expense.
-        // For simplicity now, we assume a manual deletion is needed or we don't handle it.
-        // A more robust solution would be to store the expenseId in the transfer doc.
         toast({ title: "تنبيه", description: "تم حذف التحويل، لكن قد تحتاج لحذف المصروف المرتبط به يدويًا."})
       }
 
@@ -391,71 +377,79 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     return { url, path: filePath };
   };
   
-
-  const addSupplierPayment = async (paymentData: Omit<SupplierPayment, 'id'>, file: File | null = null) => {
-    if (!currentUser) throw new Error("User not authenticated for payment");
-
+  const addSupplierPayment = async (paymentData: Omit<SupplierPayment, 'id' | 'documentUrl' | 'documentPath'>, file: File | null = null) => {
+    if (!currentUser) throw new Error("User not authenticated");
+    
     const paymentDocRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
     const paymentId = paymentDocRef.id;
-
     let documentInfo: { documentUrl?: string; documentPath?: string } = {};
 
-    if (file) {
-      const { url, path } = await uploadDocument(file, paymentId);
-      documentInfo = { documentUrl: url, documentPath: path };
-    }
-    
-    const finalPaymentData = {
-      ...paymentData,
-      ...documentInfo,
-      date: Timestamp.fromDate(paymentData.date),
-    };
-    
-    await setDoc(paymentDocRef, finalPaymentData);
+    try {
+      if (file) {
+        const { url, path } = await uploadDocument(file, paymentId);
+        documentInfo = { documentUrl: url, documentPath: path };
+      }
+      
+      const finalPaymentData = {
+        ...paymentData,
+        ...documentInfo,
+        date: Timestamp.fromDate(paymentData.date),
+      };
+      
+      await setDoc(paymentDocRef, finalPaymentData);
 
-    setSupplierPayments(prev => [{ ...paymentData, ...documentInfo, id: paymentId }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
+      const newPayment = { ...paymentData, ...documentInfo, id: paymentId } as SupplierPayment;
+      setSupplierPayments(prev => [...prev, newPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
+
+    } catch (error) {
+        console.error("Error in addSupplierPayment: ", error);
+        throw error;
+    }
   };
   
-  const updateSupplierPayment = async (existingPayment: SupplierPayment, paymentData: Omit<SupplierPayment, 'id'>, file: File | null = null) => {
+  const updateSupplierPayment = async (existingPayment: SupplierPayment, paymentData: Omit<SupplierPayment, 'id' | 'documentUrl' | 'documentPath'>, file: File | null = null) => {
     if (!currentUser) throw new Error("User not authenticated");
     
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', existingPayment.id);
-    const updatedData = { ...paymentData } as any;
+    const updatedData: Partial<SupplierPayment> = { ...paymentData };
 
-    // Handle file upload/replacement
-    if (file) {
+    try {
+      // Handle file upload/replacement
+      if (file) {
         // If a new file is uploaded, delete the old one first if it exists
         if (existingPayment.documentPath) {
-            const oldFileRef = storageRef(storage, existingPayment.documentPath);
-            try {
-                await deleteObject(oldFileRef);
-            } catch (error: any) {
-                if (error.code !== 'storage/object-not-found') {
-                    console.error("Could not delete old document:", error);
-                    // Decide if we should proceed or not. For now, we will proceed.
-                }
-            }
+          const oldFileRef = storageRef(storage, existingPayment.documentPath);
+          await deleteObject(oldFileRef).catch(error => console.warn("Old file not found, proceeding.", error));
         }
         const { url, path } = await uploadDocument(file, existingPayment.id);
         updatedData.documentUrl = url;
         updatedData.documentPath = path;
-    } else if (paymentData.documentUrl === null) {
-        // This indicates the user removed the existing document
-        if (existingPayment.documentPath) {
-             const oldFileRef = storageRef(storage, existingPayment.documentPath);
-             await deleteObject(oldFileRef);
-        }
-        updatedData.documentUrl = null;
-        updatedData.documentPath = null;
+      } else if (!paymentData.documentUrl && existingPayment.documentUrl) {
+          // This indicates the user removed the existing document without uploading a new one
+          if (existingPayment.documentPath) {
+               const oldFileRef = storageRef(storage, existingPayment.documentPath);
+               await deleteObject(oldFileRef).catch(error => console.warn("Old file not found, proceeding.", error));
+          }
+          updatedData.documentUrl = undefined;
+          updatedData.documentPath = undefined;
+      }
+
+      const finalDataToUpdate = {
+        ...updatedData,
+        date: Timestamp.fromDate(paymentData.date),
+      };
+
+      await updateDoc(paymentDocRef, finalDataToUpdate);
+      
+      const updatedLocalPayment = { ...existingPayment, ...finalDataToUpdate, date: paymentData.date };
+
+      setSupplierPayments(prev => prev.map(p => 
+          p.id === existingPayment.id ? updatedLocalPayment : p
+      ).sort((a,b) => b.date.getTime() - a.date.getTime()));
+    } catch(error) {
+       console.error("Error in updateSupplierPayment: ", error);
+       throw error;
     }
-
-    updatedData.date = Timestamp.fromDate(paymentData.date);
-
-    await updateDoc(paymentDocRef, updatedData);
-
-    setSupplierPayments(prev => prev.map(p => 
-        p.id === existingPayment.id ? { ...p, ...updatedData, date: paymentData.date } : p
-    ).sort((a,b) => b.date.getTime() - a.date.getTime()));
   };
   
   const deleteSupplierPayment = async (payment: SupplierPayment) => {
@@ -466,7 +460,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
         await deleteDoc(paymentDocRef);
         if (payment.documentPath) {
             const fileRef = storageRef(storage, payment.documentPath);
-            await deleteObject(fileRef);
+            await deleteObject(fileRef).catch(error => console.warn("File to delete not found, proceeding.", error));
         }
         setSupplierPayments(prev => prev.filter(p => p.id !== payment.id));
         toast({ title: "تم الحذف", description: "تم حذف الدفعة ومستندها المرفق بنجاح." });
