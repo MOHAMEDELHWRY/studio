@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -19,6 +19,10 @@ import {
   Hash,
   DollarSign,
   Plus,
+  Paperclip,
+  File as FileIcon,
+  X,
+  Loader2
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -59,6 +63,10 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
+
+
 const paymentSchema = z.object({
   date: z.date({ required_error: "التاريخ مطلوب." }),
   amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر."),
@@ -69,6 +77,7 @@ const paymentSchema = z.object({
   destinationBank: z.string().optional(),
   reason: z.string().trim().min(1, "يجب كتابة سبب الصرف."),
   responsiblePerson: z.string().trim().min(1, "يجب تحديد القائم بالتحويل."),
+  document: z.any().optional(),
 });
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
@@ -80,6 +89,10 @@ export default function PaymentsReportPage() {
   const [editingPayment, setEditingPayment] = useState<SupplierPayment | null>(null);
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [existingDocumentUrl, setExistingDocumentUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   const supplierNames = useMemo(() => {
     return Array.from(new Set(transactions.map(t => t.supplierName))).sort();
@@ -103,6 +116,8 @@ export default function PaymentsReportPage() {
   
   const handleOpenDialog = (payment: SupplierPayment | null) => {
     setEditingPayment(payment);
+    setSelectedFile(null);
+
     if (payment) {
       form.reset({
           ...payment,
@@ -110,18 +125,13 @@ export default function PaymentsReportPage() {
           sourceBank: payment.sourceBank ?? "",
           destinationBank: payment.destinationBank ?? "",
       });
+      setExistingDocumentUrl(payment.documentUrl || null);
     } else {
       form.reset({
-        date: new Date(),
-        amount: 0,
-        supplierName: "",
-        method: 'نقدي',
-        classification: 'دفعة من رصيد المبيعات',
-        reason: "",
-        responsiblePerson: "",
-        sourceBank: "",
-        destinationBank: "",
+        date: new Date(), amount: 0, supplierName: "", method: 'نقدي', classification: 'دفعة من رصيد المبيعات',
+        reason: "", responsiblePerson: "", sourceBank: "", destinationBank: "",
       });
+      setExistingDocumentUrl(null);
     }
     setIsDialogOpen(true);
   };
@@ -133,14 +143,30 @@ export default function PaymentsReportPage() {
     setIsDialogOpen(open);
   };
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({ title: "خطأ", description: "حجم الملف يتجاوز 5 ميجابايت.", variant: "destructive"});
+        return;
+      }
+      if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+        toast({ title: "خطأ", description: "نوع الملف غير مدعوم. يرجى رفع صورة أو ملف PDF.", variant: "destructive"});
+        return;
+      }
+      setSelectedFile(file);
+      setExistingDocumentUrl(null); // Clear existing doc if new one is selected
+    }
+  };
+
   const onSubmit = async (values: PaymentFormValues) => {
     setIsSubmitting(true);
     try {
         if (editingPayment) {
-            await updateSupplierPayment({ ...editingPayment, ...values });
+            await updateSupplierPayment(editingPayment, values, selectedFile);
             toast({ title: "نجاح", description: "تم تعديل الدفعة بنجاح." });
         } else {
-            await addSupplierPayment(values);
+            await addSupplierPayment(values, selectedFile);
             toast({ title: "نجاح", description: "تم تسجيل الدفعة بنجاح." });
         }
 
@@ -155,8 +181,8 @@ export default function PaymentsReportPage() {
     }
   };
 
-  const handleDelete = async (paymentId: string) => {
-    await deleteSupplierPayment(paymentId);
+  const handleDelete = async (payment: SupplierPayment) => {
+    await deleteSupplierPayment(payment);
   };
 
   const { totalAmount, paymentsCount } = useMemo(() => {
@@ -229,6 +255,46 @@ export default function PaymentsReportPage() {
                   
                   <FormField control={form.control} name="reason" render={({ field }) => (<FormItem><FormLabel>السبب / البيان</FormLabel><FormControl><Textarea placeholder="اكتب سببًا واضحًا للصرف..." {...field} /></FormControl><FormMessage /></FormItem>)} />
 
+                  <FormItem>
+                    <FormLabel>مستند التحويل (اختياري)</FormLabel>
+                    {isSubmitting && selectedFile ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground p-2 border rounded-md">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>جاري رفع: {selectedFile.name}</span>
+                      </div>
+                    ) : selectedFile ? (
+                       <div className="flex items-center justify-between gap-2 text-sm text-primary p-2 border border-dashed rounded-md">
+                          <div className="flex items-center gap-2">
+                             <FileIcon className="h-5 w-5" />
+                             <span className="font-medium truncate">{selectedFile.name}</span>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedFile(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                      </div>
+                    ) : existingDocumentUrl ? (
+                      <div className="flex items-center justify-between gap-2 text-sm text-primary p-2 border border-dashed rounded-md">
+                          <a href={existingDocumentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
+                             <Paperclip className="h-5 w-5" />
+                             <span className="font-medium truncate">عرض المستند الحالي</span>
+                          </a>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setExistingDocumentUrl(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                      </div>
+                    ) : (
+                      <FormControl>
+                          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full">
+                              <Paperclip className="ml-2 h-4 w-4" />
+                              اختر ملفًا (صورة أو PDF، بحد أقصى 5 ميجا)
+                              <Input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept="image/*,.pdf" />
+                          </Button>
+                      </FormControl>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+
+
                   <DialogFooter className="pt-4">
                      <DialogClose asChild>
                       <Button type="button" variant="secondary">إلغاء</Button>
@@ -249,7 +315,7 @@ export default function PaymentsReportPage() {
         <CardContent>
            <div className="relative w-full overflow-auto">
             <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
-              <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المورد</TableHead><TableHead>المبلغ</TableHead><TableHead>الطريقة</TableHead><TableHead>التصنيف</TableHead><TableHead>السبب</TableHead><TableHead>المسؤول</TableHead><TableHead>إجراءات</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>المورد</TableHead><TableHead>المبلغ</TableHead><TableHead>الطريقة</TableHead><TableHead>التصنيف</TableHead><TableHead>السبب</TableHead><TableHead>المسؤول</TableHead><TableHead>التحويلات</TableHead><TableHead>إجراءات</TableHead></TableRow></TableHeader>
               <TableBody>
                 {sortedPayments.length > 0 ? (
                   sortedPayments.map(p => (
@@ -264,6 +330,15 @@ export default function PaymentsReportPage() {
                       <TableCell>{p.reason}</TableCell>
                       <TableCell>{p.responsiblePerson}</TableCell>
                       <TableCell>
+                        {p.documentUrl ? (
+                          <a href={p.documentUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            <Paperclip className="h-5 w-5" />
+                          </a>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(p)} className="text-muted-foreground hover:text-primary">
                             <Pencil className="h-4 w-4" />
@@ -273,7 +348,7 @@ export default function PaymentsReportPage() {
                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /><span className="sr-only">حذف</span></Button></AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader><AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle><AlertDialogDescription>هذا الإجراء سيحذف الدفعة ومستندها المرفق (إن وجد) بشكل دائم ولا يمكن التراجع عنه.</AlertDialogDescription></AlertDialogHeader>
-                              <AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(p.id)}>متابعة</AlertDialogAction></AlertDialogFooter>
+                              <AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(p)}>متابعة</AlertDialogAction></AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
                         </div>
@@ -281,7 +356,7 @@ export default function PaymentsReportPage() {
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={8} className="h-24 text-center">لا توجد دفعات مسجلة.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="h-24 text-center">لا توجد دفعات مسجلة.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

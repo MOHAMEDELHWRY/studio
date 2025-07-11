@@ -51,4 +51,6 @@ export type SupplierPayment = {
   destinationBank?: string;
   reason: string;
   responsiblePerson: string;
+  documentUrl?: string;
+  documentPath?: string;
 };

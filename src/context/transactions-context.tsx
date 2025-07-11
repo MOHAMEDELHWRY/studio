@@ -20,6 +20,8 @@ import {
 } from 'firebase/firestore';
 import { 
   ref as storageRef, 
+  uploadBytes,
+  getDownloadURL,
   deleteObject
 } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
@@ -40,9 +42,9 @@ interface TransactionsContextType {
   updateBalanceTransfer: (updatedTransfer: BalanceTransfer) => Promise<void>;
   deleteBalanceTransfer: (transferId: string) => Promise<void>;
   supplierPayments: SupplierPayment[];
-  addSupplierPayment: (payment: Omit<SupplierPayment, 'id'>) => Promise<void>;
-  updateSupplierPayment: (updatedPayment: SupplierPayment) => Promise<void>;
-  deleteSupplierPayment: (paymentId: string) => Promise<void>;
+  addSupplierPayment: (paymentData: Omit<SupplierPayment, 'id'>, file?: File | null) => Promise<void>;
+  updateSupplierPayment: (existingPayment: SupplierPayment, paymentData: Omit<SupplierPayment, 'id'>, file?: File | null) => Promise<void>;
+  deleteSupplierPayment: (payment: SupplierPayment) => Promise<void>;
   supplierNames: string[];
   loading: boolean;
 }
@@ -380,78 +382,97 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addSupplierPayment = async (payment: Omit<SupplierPayment, 'id'>) => {
+  const uploadDocument = async (file: File, paymentId: string): Promise<{ url: string; path: string }> => {
+    if (!currentUser) throw new Error("User not authenticated for upload");
+    const filePath = `users/${currentUser.uid}/transfers/${paymentId}/${file.name}`;
+    const fileRef = storageRef(storage, filePath);
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+    return { url, path: filePath };
+  };
+  
+
+  const addSupplierPayment = async (paymentData: Omit<SupplierPayment, 'id'>, file: File | null = null) => {
     if (!currentUser) throw new Error("User not authenticated for payment");
 
     const paymentDocRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
     const paymentId = paymentDocRef.id;
+
+    let documentInfo: { documentUrl?: string; documentPath?: string } = {};
+
+    if (file) {
+      const { url, path } = await uploadDocument(file, paymentId);
+      documentInfo = { documentUrl: url, documentPath: path };
+    }
     
-    const newPayment: SupplierPayment = {
-      ...payment,
-      id: paymentId,
+    const finalPaymentData = {
+      ...paymentData,
+      ...documentInfo,
+      date: Timestamp.fromDate(paymentData.date),
     };
-    setSupplierPayments(prev => [newPayment, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
-
-    try {
-      const paymentData = {
-          ...payment,
-          date: Timestamp.fromDate(payment.date),
-      };
-      
-      await setDoc(paymentDocRef, paymentData);
-      
-    } catch (error) {
-      console.error("Error saving payment:", error);
-       setSupplierPayments(prev => prev.filter(p => p.id !== paymentId));
-      toast({ title: "خطأ", description: "فشل حفظ الدفعة. يرجى المحاولة مرة أخرى.", variant: "destructive" });
-      throw error;
-    }
-  };
-  
-  const updateSupplierPayment = async (updatedPayment: SupplierPayment) => {
-    if (!currentUser) throw new Error("User not authenticated");
-    const { id, ...dataToUpdate } = updatedPayment;
-    const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', id);
-
-    try {
-        setSupplierPayments(prev => prev.map(p => 
-            p.id === id ? updatedPayment : p
-        ));
-        
-        const finalData = { 
-            ...dataToUpdate, 
-            date: Timestamp.fromDate(dataToUpdate.date),
-        };
-       
-        await updateDoc(paymentDocRef, finalData as any);
-
-        setSupplierPayments(prev => prev.map(p => 
-            p.id === id ? updatedPayment : p
-        ).sort((a,b) => b.date.getTime() - a.date.getTime()));
-
-    } catch (error) {
-        console.error("Error updating supplier payment:", error);
-        toast({ title: "خطأ", description: "فشل تحديث الدفعة.", variant: "destructive" });
-        throw error;
-    }
-  };
-  
-  const deleteSupplierPayment = async (paymentId: string) => {
-    if (!currentUser) return;
-    const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', paymentId);
     
-    const paymentToDelete = supplierPayments.find(p => p.id === paymentId);
-    if (!paymentToDelete) return;
+    await setDoc(paymentDocRef, finalPaymentData);
 
-    setSupplierPayments(prev => prev.filter(p => p.id !== paymentId));
+    setSupplierPayments(prev => [{ ...paymentData, ...documentInfo, id: paymentId }, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
+  };
+  
+  const updateSupplierPayment = async (existingPayment: SupplierPayment, paymentData: Omit<SupplierPayment, 'id'>, file: File | null = null) => {
+    if (!currentUser) throw new Error("User not authenticated");
+    
+    const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', existingPayment.id);
+    const updatedData = { ...paymentData } as any;
 
+    // Handle file upload/replacement
+    if (file) {
+        // If a new file is uploaded, delete the old one first if it exists
+        if (existingPayment.documentPath) {
+            const oldFileRef = storageRef(storage, existingPayment.documentPath);
+            try {
+                await deleteObject(oldFileRef);
+            } catch (error: any) {
+                if (error.code !== 'storage/object-not-found') {
+                    console.error("Could not delete old document:", error);
+                    // Decide if we should proceed or not. For now, we will proceed.
+                }
+            }
+        }
+        const { url, path } = await uploadDocument(file, existingPayment.id);
+        updatedData.documentUrl = url;
+        updatedData.documentPath = path;
+    } else if (paymentData.documentUrl === null) {
+        // This indicates the user removed the existing document
+        if (existingPayment.documentPath) {
+             const oldFileRef = storageRef(storage, existingPayment.documentPath);
+             await deleteObject(oldFileRef);
+        }
+        updatedData.documentUrl = null;
+        updatedData.documentPath = null;
+    }
+
+    updatedData.date = Timestamp.fromDate(paymentData.date);
+
+    await updateDoc(paymentDocRef, updatedData);
+
+    setSupplierPayments(prev => prev.map(p => 
+        p.id === existingPayment.id ? { ...p, ...updatedData, date: paymentData.date } : p
+    ).sort((a,b) => b.date.getTime() - a.date.getTime()));
+  };
+  
+  const deleteSupplierPayment = async (payment: SupplierPayment) => {
+    if (!currentUser) return;
+    const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', payment.id);
+    
     try {
-      await deleteDoc(paymentDocRef);
-      toast({ title: "تم الحذف", description: "تم حذف الدفعة بنجاح." });
+        await deleteDoc(paymentDocRef);
+        if (payment.documentPath) {
+            const fileRef = storageRef(storage, payment.documentPath);
+            await deleteObject(fileRef);
+        }
+        setSupplierPayments(prev => prev.filter(p => p.id !== payment.id));
+        toast({ title: "تم الحذف", description: "تم حذف الدفعة ومستندها المرفق بنجاح." });
     } catch (error) {
-      setSupplierPayments(prev => [...prev, paymentToDelete].sort((a,b)=>b.date.getTime() - a.date.getTime()));
-      console.error("Error deleting supplier payment: ", error);
-      toast({ title: "خطأ", description: "لم نتمكن من حذف الدفعة.", variant: "destructive" });
+        console.error("Error deleting supplier payment: ", error);
+        toast({ title: "خطأ", description: "لم نتمكن من حذف الدفعة.", variant: "destructive" });
     }
   };
 
@@ -477,5 +498,3 @@ export function useTransactions() {
   }
   return context;
 }
-
-    
