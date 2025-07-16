@@ -48,9 +48,10 @@ export type SupplierPayment = {
   method: 'نقدي' | 'بنكي';
   classification: 'دفعة من رصيد المبيعات' | 'سحب أرباح للمورد' | 'سداد للمصنع عن المورد' | 'استعادة مبلغ كتسوية' | 'سحب مبلغ كتسوية';
   sourceBank?: string;
+  status?: 'uploading' | 'completed' | 'upload_failed';
+  documentUrl?: string;
+  documentPath?: string;
   destinationBank?: string;
   reason: string;
   responsiblePerson: string;
-  documentUrl?: string;
-  documentPath?: string;
 };

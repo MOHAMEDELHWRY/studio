@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
@@ -7,22 +6,24 @@ import { db, storage } from '@/lib/firebase';
 import { 
   collection, 
   getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
+  addDoc,
+  deleteDoc,
   doc,
   getDoc,
-  query,
-  where,
-  writeBatch,
+  setDoc,
+  updateDoc,
   Timestamp,
-  setDoc
+  query,
+  orderBy,
+  where,
+  writeBatch
 } from 'firebase/firestore';
 import { 
-  ref as storageRef, 
+  ref,
   uploadBytes,
   getDownloadURL,
-  deleteObject
+  deleteObject,
+  uploadBytesResumable
 } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './auth-context';
@@ -53,12 +54,13 @@ const TransactionsContext = createContext<TransactionsContextType | undefined>(u
 
 export function TransactionsProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
+  const { toast } = useToast();
+  
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balanceTransfers, setBalanceTransfers] = useState<BalanceTransfer[]>([]);
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
   
   const supplierNames = useMemo(() => {
     const allNames = new Set<string>();
@@ -368,26 +370,113 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const MAX_RETRIES = 5; // زيادة عدد المحاولات
+  const RETRY_DELAY = 3000; // زيادة وقت الانتظار بين المحاولات (3 ثواني)
+  
   const uploadDocument = async (file: File, paymentId: string): Promise<{ url: string; path: string }> => {
-    if (!currentUser) throw new Error("User not authenticated for upload");
-    const filePath = `users/${currentUser.uid}/transfers/${paymentId}/${file.name}`;
-    const fileRef = storageRef(storage, filePath);
-    await uploadBytes(fileRef, file);
-    const url = await getDownloadURL(fileRef);
-    return { url, path: filePath };
+    if (!currentUser) throw new Error("يجب تسجيل الدخول أولاً");
+    
+    // التحقق من حجم الملف (5MB كحد أقصى)
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error('حجم الملف كبير جداً. الحد الأقصى هو 5 ميجابايت');
+    }
+
+    // التحقق من نوع الملف
+    if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
+      throw new Error('نوع الملف غير مدعوم. يرجى رفع صور أو ملفات PDF فقط');
+    }
+
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        // إضافة timestamp للتأكد من عدم تكرار أسماء الملفات
+        const timestamp = Date.now();
+        const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = `users/${currentUser.uid}/payments/${paymentId}/${timestamp}_${safeFileName}`;
+        const fileRef = ref(storage, filePath);
+
+        // محاولة الرفع باستخدام uploadBytes أولاً
+        await uploadBytes(fileRef, file, {
+          contentType: file.type,
+          customMetadata: {
+            paymentId,
+            uploadTime: new Date().toISOString(),
+            attempt: String(attempt + 1),
+            originalName: file.name
+          }
+        });
+
+        // بعد نجاح الرفع، نحصل على رابط التحميل
+        const downloadURL = await getDownloadURL(fileRef);
+        
+        return {
+          url: downloadURL,
+          path: filePath
+        };
+
+      } catch (error: any) {
+        lastError = error;
+        console.error(`محاولة الرفع ${attempt + 1} فشلت:`, error);
+
+        if (error.code === 'storage/unknown' || error.code === 'storage/retry-limit-exceeded') {
+          // انتظار قبل المحاولة التالية
+          const delay = RETRY_DELAY * Math.pow(2, attempt);
+          console.log(`انتظار ${delay/1000} ثواني قبل إعادة المحاولة...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // إذا كان الخطأ ليس متعلقاً بـ CORS أو الاتصال، نتوقف عن المحاولة
+        throw new Error(
+          error.code === 'storage/unauthorized' 
+            ? 'غير مصرح لك برفع الملفات. يرجى تسجيل الدخول مرة أخرى.'
+            : 'حدث خطأ أثناء رفع الملف. يرجى المحاولة مرة أخرى.'
+        );
+      }
+    }
+
+    throw lastError || new Error('فشل رفع الملف بعد عدة محاولات. يرجى المحاولة مرة أخرى لاحقاً.');
   };
   
   const addSupplierPayment = async (paymentData: Omit<SupplierPayment, 'id' | 'documentUrl' | 'documentPath'>, file: File | null = null) => {
     if (!currentUser) throw new Error("User not authenticated");
     
+    // Generate the document reference
     const paymentDocRef = doc(collection(db, 'users', currentUser.uid, 'supplierPayments'));
     const paymentId = paymentDocRef.id;
     let documentInfo: { documentUrl?: string; documentPath?: string } = {};
 
     try {
+      // Create payment document first for better UX
+      const initialPaymentData = {
+        ...paymentData,
+        date: Timestamp.fromDate(paymentData.date),
+        status: file ? 'uploading' : 'completed',
+      };
+
+      // Save initial payment data
+      await setDoc(paymentDocRef, initialPaymentData);
+
+      // Handle file upload if exists
       if (file) {
-        const { url, path } = await uploadDocument(file, paymentId);
-        documentInfo = { documentUrl: url, documentPath: path };
+        try {
+          const uploadResult = await uploadDocument(file, paymentId);
+          documentInfo = {
+            documentUrl: uploadResult.url,
+            documentPath: uploadResult.path
+          };
+          // Update document with file info and status
+          await updateDoc(paymentDocRef, {
+            ...documentInfo,
+            status: 'completed'
+          });
+        } catch (uploadError) {
+          console.error('Upload failed:', uploadError);
+          // Update document to indicate upload failure but keep the payment
+          await updateDoc(paymentDocRef, { status: 'upload_failed' });
+          throw new Error('تم حفظ الدفعة ولكن فشل رفع المستند. يمكنك تعديل الدفعة لإعادة رفع المستند.');
+        }
       }
       
       const finalPaymentData = {
@@ -399,37 +488,38 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
       await setDoc(paymentDocRef, finalPaymentData);
 
       const newPayment = { ...paymentData, ...documentInfo, id: paymentId } as SupplierPayment;
-      setSupplierPayments(prev => [...prev, newPayment].sort((a, b) => b.date.getTime() - a.date.getTime()));
+      setSupplierPayments(prev => [newPayment, ...prev].sort((a, b) => b.date.getTime() - a.date.getTime()));
 
     } catch (error) {
-        console.error("Error in addSupplierPayment: ", error);
-        throw error;
+      console.error("Error in addSupplierPayment: ", error);
+      throw error;
     }
   };
   
-  const updateSupplierPayment = async (existingPayment: SupplierPayment, paymentData: Omit<SupplierPayment, 'id' | 'documentUrl' | 'documentPath'>, file: File | null = null) => {
+  const updateSupplierPayment = async (existingPayment: SupplierPayment, paymentData: Omit<SupplierPayment, 'id'>, file: File | null = null) => {
     if (!currentUser) throw new Error("User not authenticated");
     
     const paymentDocRef = doc(db, 'users', currentUser.uid, 'supplierPayments', existingPayment.id);
-    const updatedData: Partial<SupplierPayment> = { ...paymentData };
+    const updatedData: Partial<SupplierPayment> = { 
+      ...paymentData,
+      status: file ? 'uploading' : paymentData.status || 'completed'
+    };
 
     try {
       // Handle file upload/replacement
       if (file) {
         // If a new file is uploaded, delete the old one first if it exists
         if (existingPayment.documentPath) {
-          const oldFileRef = storageRef(storage, existingPayment.documentPath);
+          const oldFileRef = ref(storage, existingPayment.documentPath);
           await deleteObject(oldFileRef).catch(error => console.warn("Old file not found, proceeding.", error));
         }
         const { url, path } = await uploadDocument(file, existingPayment.id);
         updatedData.documentUrl = url;
         updatedData.documentPath = path;
-      } else if (!paymentData.documentUrl && existingPayment.documentUrl) {
+      } else if (existingPayment.documentPath && existingPayment.documentUrl) {
           // This indicates the user removed the existing document without uploading a new one
-          if (existingPayment.documentPath) {
-               const oldFileRef = storageRef(storage, existingPayment.documentPath);
-               await deleteObject(oldFileRef).catch(error => console.warn("Old file not found, proceeding.", error));
-          }
+          const oldFileRef = ref(storage, existingPayment.documentPath);
+          await deleteObject(oldFileRef).catch(error => console.warn("Old file not found, proceeding.", error));
           updatedData.documentUrl = undefined;
           updatedData.documentPath = undefined;
       }
@@ -459,7 +549,7 @@ export function TransactionsProvider({ children }: { children: ReactNode }) {
     try {
         await deleteDoc(paymentDocRef);
         if (payment.documentPath) {
-            const fileRef = storageRef(storage, payment.documentPath);
+            const fileRef = ref(storage, payment.documentPath);
             await deleteObject(fileRef).catch(error => console.warn("File to delete not found, proceeding.", error));
         }
         setSupplierPayments(prev => prev.filter(p => p.id !== payment.id));
