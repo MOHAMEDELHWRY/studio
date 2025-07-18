@@ -3,13 +3,14 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
+import { getAnalytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBlKr5prSIXiW6UPzpI8MDj7wVdOXLrGtY",
   authDomain: "retsary-e622c.firebaseapp.com",
   projectId: "retsary-e622c",
-  storageBucket: "retsary-e622c.appspot.com",
+  storageBucket: "retsary-e622c.firebasestorage.app",
   messagingSenderId: "1080480805531",
   appId: "1:1080480805531:web:326d55de0777df33914c3e",
   measurementId: "G-4NFQ9CH8Z0"
@@ -17,6 +18,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const analytics = getAnalytics(app);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
@@ -25,4 +27,4 @@ const storage = getStorage(app);
 storage.maxUploadRetryTime = 300000; // 5 minutes
 storage.maxOperationRetryTime = 300000; // 5 minutes
 
-export { app, db, auth, storage };
+export { app, analytics, db, auth, storage };
