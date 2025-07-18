@@ -67,10 +67,15 @@ const analyzePerformanceFlow = ai.defineFlow(
     outputSchema: PerformanceAnalysisOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    if (!output) {
-      return { analysis: "لم يتمكن الذكاء الاصطناعي من إنشاء تحليل. قد تكون هناك مشكلة مؤقتة. يرجى المحاولة مرة أخرى لاحقًا." };
+    try {
+      const {output} = await prompt(input);
+      if (!output) {
+        return { analysis: "لم يتمكن الذكاء الاصطناعي من إنشاء تحليل. قد تكون هناك مشكلة مؤقتة. يرجى المحاولة مرة أخرى لاحقًا." };
+      }
+      return output;
+    } catch (error) {
+      console.error("AI analyzePerformanceFlow error:", error);
+      return { analysis: "حدث خطأ أثناء تحليل البيانات بواسطة الذكاء الاصطناعي. يرجى المحاولة مرة أخرى لاحقًا." };
     }
-    return output;
   }
 );
