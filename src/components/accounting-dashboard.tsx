@@ -69,7 +69,7 @@ import {
 import { SidebarTrigger } from './ui/sidebar';
 import { Skeleton } from './ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
-import { analyzePerformance, type PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
+import { type PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
 import { descriptionOptions, categoryOptions, varietyOptions } from '@/data/transaction-data';
 
 const transactionSchema = z.object({
@@ -348,15 +348,36 @@ export default function AccountingDashboard() {
     setAnalysis(null);
     try {
       const analysisInput = {
-        transactions: transactions.map(t => ({ date: t.date.toISOString(), supplierName: t.supplierName, governorate: t.governorate || '', city: t.city || '', totalSellingPrice: t.totalSellingPrice, profit: t.profit })),
-        totalProfit: totalProfit, totalExpenses: totalExpenses,
+        transactions: transactions.map(t => ({ 
+          date: t.date.toISOString(), 
+          supplierName: t.supplierName, 
+          governorate: t.governorate || '', 
+          city: t.city || '', 
+          totalSellingPrice: t.totalSellingPrice, 
+          profit: t.profit 
+        })),
+        totalProfit: totalProfit, 
+        totalExpenses: totalExpenses,
       };
-      const result: PerformanceAnalysisOutput = await analyzePerformance(analysisInput);
+
+      const response = await fetch('/api/analyze-performance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(analysisInput),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result: PerformanceAnalysisOutput = await response.json();
       setAnalysis(result && result.analysis ? result : { analysis: "لم يتمكن الذكاء الاصطناعي من إنشاء تحليل." });
     } catch (error) {
       console.error("Error generating analysis:", error);
       toast({ title: 'خطأ في التحليل', description: 'حدث خطأ أثناء توليد التحليل.', variant: 'destructive' });
-      setAnalysis({ analysis: "لم نتمكن من إتمام التحليل بسبب خطأ فني." });
+      setAnalysis({ analysis: "لم نتمكن من إتمام التحليل بسبب خطأ فني. يرجى التأكد من إعدادات الذكاء الاصطناعي." });
     } finally {
       setIsAnalyzing(false);
     }
