@@ -38,9 +38,22 @@ export async function analyzePerformance(input: PerformanceAnalysisInput): Promi
     return result;
   } catch (error) {
     console.error("AI analyzePerformance error:", error);
-    // Fallback to a meaningful error message in Arabic
+    
+    // Provide specific error messages based on error type
+    let errorMessage = "حدث خطأ أثناء تحليل البيانات بواسطة الذكاء الاصطناعي.";
+    
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        errorMessage = "خطأ في مفتاح API للذكاء الاصطناعي. يرجى التحقق من إعدادات المفتاح.";
+      } else if (error.message.includes('quota') || error.message.includes('limit')) {
+        errorMessage = "تم تجاوز حد الاستخدام لخدمة الذكاء الاصطناعي. يرجى المحاولة لاحقًا.";
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorMessage = "خطأ في الاتصال بخدمة الذكاء الاصطناعي. يرجى التحقق من الاتصال بالإنترنت.";
+      }
+    }
+    
     return { 
-      analysis: "حدث خطأ أثناء تحليل البيانات بواسطة الذكاء الاصطناعي. يرجى التأكد من إعداد مفتاح API والمحاولة مرة أخرى لاحقًا." 
+      analysis: `${errorMessage} يرجى المحاولة مرة أخرى لاحقًا.` 
     };
   }
 }
