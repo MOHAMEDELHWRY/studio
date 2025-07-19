@@ -25,4 +25,5 @@ module.exports = {
     },
   ],
   globals: {},
+  ignorePatterns: ["lib/**/*"],
 };

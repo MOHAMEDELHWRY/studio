@@ -41,7 +41,7 @@ const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 exports.ftpUpload = functions.https.onCall(async (data, context) => {
     // Check if user is authenticated
-    if (!context?.auth) {
+    if (!context || !context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
     const { fileUrl, remotePath, ftpConfig } = data;

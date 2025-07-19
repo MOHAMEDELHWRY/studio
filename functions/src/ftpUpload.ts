@@ -24,7 +24,7 @@ export const ftpUpload = functions.https.onCall(
     context: any
   ) => {
     // Check if user is authenticated
-    if (!context?.auth) {
+    if (!context || !context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',
         'User must be authenticated'
