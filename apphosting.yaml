@@ -5,3 +5,7 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+  
+  # Environment variables for production
+  env:
+    GOOGLE_API_KEY: AIzaSyBJ-ekVTbzPZFsRR8Pa1-kjYb9_ezO3Hz0
