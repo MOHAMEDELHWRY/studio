@@ -30,7 +30,7 @@ firebase deploy
 
 ### 3. Verify Environment Variables
 After deployment, the production server will have access to:
-- `GOOGLE_API_KEY`: AIzaSyBJ-ekVTbzPZFsRR8Pa1-kjYb9_ezO3Hz0
+- `GOOGLE_API_KEY`: AIzaSyDtvc0zhvS-IhU5q_ibrfK0GeDg7DLPeug
 
 ## Testing After Deployment
 1. Visit https://retsary.adsolutions-eg.com/

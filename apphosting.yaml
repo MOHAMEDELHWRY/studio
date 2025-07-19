@@ -8,4 +8,4 @@ runConfig:
   
   # Environment variables for production
   env:
-    GOOGLE_API_KEY: AIzaSyBJ-ekVTbzPZFsRR8Pa1-kjYb9_ezO3Hz0
+    GOOGLE_API_KEY: AIzaSyDtvc0zhvS-IhU5q_ibrfK0GeDg7DLPeug
