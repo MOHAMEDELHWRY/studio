@@ -32,7 +32,14 @@ const PerformanceAnalysisOutputSchema = z.object({
 export type PerformanceAnalysisOutput = z.infer<typeof PerformanceAnalysisOutputSchema>;
 
 export async function analyzePerformance(input: PerformanceAnalysisInput): Promise<PerformanceAnalysisOutput> {
-  return analyzePerformanceFlow(input);
+  // Mock response for testing UI without AI call
+  const mockAnalysis = `
+  - نظرة عامة على الأداء: إجمالي الأرباح جيدة مع بعض المصروفات.
+  - الموردون الأعلى أداءً: المورد أ، المورد ب، المورد ج.
+  - المناطق الجغرافية الأكثر مبيعًا: القاهرة، الجيزة، الإسكندرية.
+  - رؤى واقتراحات: تحسين أداء الموردين الضعفاء، استكشاف فرص النمو في المناطق الجديدة.
+  `;
+  return { analysis: mockAnalysis };
 }
 
 const prompt = ai.definePrompt({
