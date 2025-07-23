@@ -714,7 +714,7 @@ export default function AccountingDashboard() {
                                 <TableCell>{t.supplierName}</TableCell>
                                 <TableCell>{t.description}</TableCell>
                                 <TableCell>{t.governorate || '-'}{t.city ? ` - ${t.city}` : ''}</TableCell>
-                                <TableCell>{t.quantity} طن</TableCell>
+                                <TableCell>{t.quantity} طن{t.variety ? ` / ${t.variety}` : ''}</TableCell>
                                 <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
                                 <TableCell>{t.totalSellingPrice > 0 ? t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }) : '-'}</TableCell>
                                 <TableCell className={t.profit >= 0 ? 'text-success' : 'text-destructive'}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
