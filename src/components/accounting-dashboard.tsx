@@ -112,6 +112,9 @@ export default function AccountingDashboard() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+  const [dateType, setDateType] = useState<'operation' | 'execution'>('operation');
   const [analysis, setAnalysis] = useState<PerformanceAnalysisOutput | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   
@@ -258,10 +261,24 @@ export default function AccountingDashboard() {
         t.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (t.governorate && t.governorate.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (t.city && t.city.toLowerCase().includes(searchTerm.toLowerCase()));
-      const dateMatch = dateFilter ? format(t.date, 'yyyy-MM-dd') === format(dateFilter, 'yyyy-MM-dd') : true;
+      
+      let dateMatch = true;
+      
+      if (startDate || endDate) {
+        const targetDate = dateType === 'operation' ? t.date : (t.executionDate || t.date);
+        
+        if (startDate && endDate) {
+          dateMatch = targetDate >= startDate && targetDate <= endDate;
+        } else if (startDate) {
+          dateMatch = targetDate >= startDate;
+        } else if (endDate) {
+          dateMatch = targetDate <= endDate;
+        }
+      }
+      
       return searchMatch && dateMatch;
     }).sort((a,b) => b.date.getTime() - a.date.getTime());
-  }, [transactions, searchTerm, dateFilter]);
+  }, [transactions, searchTerm, startDate, endDate, dateType]);
   
   const {
     totalSales,
