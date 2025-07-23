@@ -132,6 +132,42 @@ export default function AccountingDashboard() {
   const [isDueDatePopoverOpen, setIsDueDatePopoverOpen] = useState(false);
   const [isExpenseDatePopoverOpen, setIsExpenseDatePopoverOpen] = useState(false);
   const [isFilterDatePopoverOpen, setIsFilterDatePopoverOpen] = useState(false);
+  const [isStartDatePopoverOpen, setIsStartDatePopoverOpen] = useState(false);
+  const [isEndDatePopoverOpen, setIsEndDatePopoverOpen] = useState(false);
+
+  const setDateRangePreset = (preset: 'today' | 'week' | 'month' | 'all') => {
+    const today = new Date();
+    let start: Date | undefined;
+    let end: Date | undefined;
+
+    switch (preset) {
+      case 'today':
+        start = today;
+        end = today;
+        break;
+      case 'week':
+        start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
+        end = today;
+        break;
+      case 'month':
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = today;
+        break;
+      case 'all':
+        start = undefined;
+        end = undefined;
+        break;
+    }
+
+    setStartDate(start);
+    setEndDate(end);
+  };
+
+  const clearDateFilter = () => {
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setDateType('operation');
+  };
   
   const [availableCities, setAvailableCities] = useState<string[]>([]);
 
@@ -592,14 +628,76 @@ export default function AccountingDashboard() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input placeholder="بحث بالوصف أو اسم المورد..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Popover open={isFilterDatePopoverOpen} onOpenChange={setIsFilterDatePopoverOpen}>
-                          <PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full md:w-[240px] justify-start text-right font-normal", !dateFilter && "text-muted-foreground")}><CalendarIcon className="ml-2 h-4 w-4" />{dateFilter ? format(dateFilter, "PPP", { locale: ar }) : <span>فلترة بالتاريخ</span>}</Button></PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="center">
-                            <Calendar mode="single" selected={dateFilter} onSelect={(date) => { setDateFilter(date); setIsFilterDatePopoverOpen(false); }} initialFocus />
-                          </PopoverContent>
-                        </Popover>
-                        {dateFilter && <Button variant="ghost" onClick={() => setDateFilter(undefined)}>مسح الفلتر</Button>}
+                      <div className="flex flex-col md:flex-row gap-2">
+                        <div className="flex items-center gap-2">
+                          <Select value={dateType} onValueChange={(value) => setDateType(value as 'operation' | 'execution')}>
+                            <SelectTrigger className="w-[140px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="operation">تاريخ العملية</SelectItem>
+                              <SelectItem value="execution">تاريخ التنفيذ</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Popover open={isStartDatePopoverOpen} onOpenChange={setIsStartDatePopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <Button variant={"outline"} className={cn("w-full md:w-[180px] justify-start text-right font-normal", !startDate && "text-muted-foreground")}>
+                                <CalendarIcon className="ml-2 h-4 w-4" />
+                                {startDate ? format(startDate, "PPP", { locale: ar }) : <span>من تاريخ</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="center">
+                              <Calendar 
+                                mode="single" 
+                                selected={startDate} 
+                                onSelect={(date) => { 
+                                  setStartDate(date); 
+                                  setIsStartDatePopoverOpen(false); 
+                                }} 
+                                initialFocus 
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Popover open={isEndDatePopoverOpen} onOpenChange={setIsEndDatePopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <Button variant={"outline"} className={cn("w-full md:w-[180px] justify-start text-right font-normal", !endDate && "text-muted-foreground")}>
+                                <CalendarIcon className="ml-2 h-4 w-4" />
+                                {endDate ? format(endDate, "PPP", { locale: ar }) : <span>إلى تاريخ</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="center">
+                              <Calendar 
+                                mode="single" 
+                                selected={endDate} 
+                                onSelect={(date) => { 
+                                  setEndDate(date); 
+                                  setIsEndDatePopoverOpen(false); 
+                                }} 
+                                initialFocus 
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select onValueChange={(value) => setDateRangePreset(value as 'today' | 'week' | 'month' | 'all')}>
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue placeholder="مدة سريعة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="today">اليوم</SelectItem>
+                              <SelectItem value="week">هذا الأسبوع</SelectItem>
+                              <SelectItem value="month">هذا الشهر</SelectItem>
+                              <SelectItem value="all">الكل</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {(startDate || endDate) && (
+                            <Button variant="ghost" onClick={clearDateFilter} className="text-destructive">
+                              مسح الفلتر
+                            </Button>
+                          )}
+                        </div>
                       </div>
                   </div>
               </CardHeader>
