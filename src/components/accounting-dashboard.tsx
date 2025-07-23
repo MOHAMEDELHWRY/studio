@@ -465,7 +465,7 @@ export default function AccountingDashboard() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto px-2 py-4 md:px-4 md:py-8">
       <header className="flex items-center justify-between mb-8 gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <SidebarTrigger />
