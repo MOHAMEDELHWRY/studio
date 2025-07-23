@@ -590,7 +590,48 @@ export default function AccountingDashboard() {
                   <div className="relative w-full overflow-auto">
                       <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                           <TableHeader><TableRow><TableHead>م</TableHead><TableHead>التاريخ</TableHead><TableHead>تاريخ التنفيذ</TableHead><TableHead>اسم المورد</TableHead><TableHead>الوصف</TableHead><TableHead>المنطقة</TableHead><TableHead>الكمية / التفاصيل</TableHead><TableHead>إجمالي الشراء</TableHead><TableHead>إجمالي البيع</TableHead><TableHead>صافي الربح</TableHead><TableHead>المدفوع للمصنع</TableHead><TableHead>المستلم من المورد</TableHead><TableHead>الإجراءات</TableHead></TableRow></TableHeader>
-<TableCell>{t.showExecutionDate && t.executionDate ? format(t.executionDate, 'dd MMMM yyyy', { locale: ar }) : '-'}</TableCell>
+                          <TableBody>
+                            {filteredAndSortedTransactions.map((t, index) => (
+                              <TableRow key={t.id}>
+                                <TableCell>{filteredAndSortedTransactions.length - index}</TableCell>
+                                <TableCell>{format(t.date, 'dd-MM-yy')}</TableCell>
+                                <TableCell>{t.showExecutionDate && t.executionDate ? format(t.executionDate, 'dd MMMM yyyy', { locale: ar }) : '-'}</TableCell>
+                                <TableCell>{t.supplierName}</TableCell>
+                                <TableCell>{t.description}</TableCell>
+                                <TableCell>{t.governorate || '-'}{t.city ? ` - ${t.city}` : ''}</TableCell>
+                                <TableCell>{t.quantity} طن</TableCell>
+                                <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{t.totalSellingPrice > 0 ? t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }) : '-'}</TableCell>
+                                <TableCell className={t.profit >= 0 ? 'text-success' : 'text-destructive'}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center">
+                                    <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)}>
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle>
+                                          <AlertDialogDescription>هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف العملية بشكل دائم.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDeleteTransaction(t.id)}>متابعة</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
                       </Table>
                   </div>
               </CardContent>
