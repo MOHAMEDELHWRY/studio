@@ -2,6 +2,7 @@ export type Transaction = {
   id: string;
   date: Date;
   executionDate?: Date;
+  showExecutionDate?: boolean;
   dueDate?: Date;
   supplierName: string;
   governorate?: string;

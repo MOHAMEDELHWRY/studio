@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -75,6 +74,7 @@ import { descriptionOptions, categoryOptions, varietyOptions } from '@/data/tran
 const transactionSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
   executionDate: z.date().optional(),
+  showExecutionDate: z.boolean().optional().default(false),
   dueDate: z.date().optional(),
   supplierName: z.string().trim().min(1, 'اسم المورد مطلوب.'),
   governorate: z.string().optional(),
@@ -139,7 +139,7 @@ export default function AccountingDashboard() {
   // Transaction Form
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
-    defaultValues: { date: new Date(), executionDate: undefined, dueDate: undefined, supplierName: "", governorate: "", city: "", description: "اسمنت العريش", category: "", variety: "", quantity: 0, purchasePrice: 0, sellingPrice: 0, taxes: 0, amountPaidToFactory: 0, amountReceivedFromSupplier: 0 },
+    defaultValues: { date: new Date(), executionDate: undefined, dueDate: undefined, supplierName: "", governorate: "", city: "", description: "اسمنت العريش", category: "", variety: "", quantity: 0, purchasePrice: 0, sellingPrice: 0, taxes: 0, amountPaidToFactory: 0, amountReceivedFromSupplier: 0, showExecutionDate: false },
   });
   const { watch, setValue } = form;
   const watchedValues = watch();
@@ -169,10 +169,11 @@ export default function AccountingDashboard() {
         date: new Date(transaction.date),
         executionDate: transaction.executionDate ? new Date(transaction.executionDate) : undefined,
         dueDate: transaction.dueDate ? new Date(transaction.dueDate) : undefined,
+        showExecutionDate: transaction.showExecutionDate ?? false,
       });
        if (transaction.governorate) setAvailableCities(cities[transaction.governorate] || []);
     } else {
-      form.reset({ date: new Date(), executionDate: undefined, dueDate: undefined, supplierName: "", governorate: "", city: "", description: "اسمنت العريش", category: "", variety: "", quantity: 0, purchasePrice: 0, sellingPrice: 0, taxes: 0, amountPaidToFactory: 0, amountReceivedFromSupplier: 0 });
+      form.reset({ date: new Date(), executionDate: undefined, dueDate: undefined, supplierName: "", governorate: "", city: "", description: "اسمنت العريش", category: "", variety: "", quantity: 0, purchasePrice: 0, sellingPrice: 0, taxes: 0, amountPaidToFactory: 0, amountReceivedFromSupplier: 0, showExecutionDate: false });
     }
     setIsDialogOpen(true);
   };
@@ -498,6 +499,19 @@ export default function AccountingDashboard() {
                           <FormField control={form.control} name="executionDate" render={({ field }) => (
                             <FormItem className="flex flex-col"><FormLabel>تاريخ التنفيذ (اختياري)</FormLabel><Popover modal={false} open={isExecDatePopoverOpen} onOpenChange={setIsExecDatePopoverOpen}><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="ml-2 h-4 w-4" />{field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}</Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsExecDatePopoverOpen(false); }} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
                           )} />
+                          <FormField control={form.control} name="showExecutionDate" render={({ field }) => (
+                            <FormItem className="flex items-center space-x-2">
+                              <FormControl>
+                                <input
+                                  type="checkbox"
+                                  checked={field.value}
+                                  onChange={(e) => field.onChange(e.target.checked)}
+                                  className="h-4 w-4 rounded border"
+                                />
+                              </FormControl>
+                              <FormLabel className="mb-0 flex-1 cursor-pointer">إظهار تاريخ التنفيذ</FormLabel>
+                            </FormItem>
+                          )} />
                           <FormField control={form.control} name="dueDate" render={({ field }) => (
                             <FormItem className="flex flex-col"><FormLabel>تاريخ الاستحقاق (اختياري)</FormLabel><Popover modal={false} open={isDueDatePopoverOpen} onOpenChange={setIsDueDatePopoverOpen}><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full justify-start text-right font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="ml-2 h-4 w-4" />{field.value ? format(field.value, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}</Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsDueDatePopoverOpen(false); }} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
                           )} />
@@ -576,7 +590,7 @@ export default function AccountingDashboard() {
                   <div className="relative w-full overflow-auto">
                       <Table className="[&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                           <TableHeader><TableRow><TableHead>م</TableHead><TableHead>التاريخ</TableHead><TableHead>تاريخ التنفيذ</TableHead><TableHead>اسم المورد</TableHead><TableHead>الوصف</TableHead><TableHead>المنطقة</TableHead><TableHead>الكمية / التفاصيل</TableHead><TableHead>إجمالي الشراء</TableHead><TableHead>إجمالي البيع</TableHead><TableHead>صافي الربح</TableHead><TableHead>المدفوع للمصنع</TableHead><TableHead>المستلم من المورد</TableHead><TableHead>الإجراءات</TableHead></TableRow></TableHeader>
-                          <TableBody>{filteredAndSortedTransactions.length > 0 ? (filteredAndSortedTransactions.map((t, index) => (<TableRow key={t.id}><TableCell>{filteredAndSortedTransactions.length - index}</TableCell><TableCell>{format(t.date, 'dd MMMM yyyy', { locale: ar })}</TableCell><TableCell>{t.executionDate ? format(t.executionDate, 'dd MMMM yyyy', { locale: ar }) : '-'}</TableCell><TableCell><Link href={`/supplier/${encodeURIComponent(t.supplierName)}`} className="font-medium text-primary hover:underline">{t.supplierName}</Link></TableCell><TableCell>{t.description}</TableCell><TableCell>{[t.governorate, t.city].filter(Boolean).join(' - ')}</TableCell><TableCell>{`${t.quantity.toLocaleString('ar-EG')} طن`}{(t.category || t.variety) && (<span className="text-muted-foreground text-xs mx-1">({[t.category, t.variety].filter(Boolean).join(' / ')})</span>)}</TableCell><TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell><TableCell>{t.totalSellingPrice > 0 ? (t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })) : (<span className="text-muted-foreground">لم يتم البيع</span>)}</TableCell><TableCell className={`font-bold ${t.profit >= 0 ? 'text-success' : 'text-destructive'}`}>{t.totalSellingPrice > 0 ? (t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })) : (<span className="text-muted-foreground">-</span>)}</TableCell><TableCell className="text-primary">{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell><TableCell className="text-success">{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell><TableCell><div className="flex items-center"><Button variant="ghost" size="icon" onClick={() => handleOpenDialog(t)} className="text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /><span className="sr-only">تعديل</span></Button><AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /><span className="sr-only">حذف</span></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>هل أنت متأكد تمامًا؟</AlertDialogTitle><AlertDialogDescription>هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف العملية بشكل دائم.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteTransaction(t.id)}>متابعة</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div></TableCell></TableRow>))) : (<TableRow><TableCell colSpan={13} className="h-24 text-center">لا توجد عمليات لعرضها.</TableCell></TableRow>)}</TableBody>
+<TableCell>{t.showExecutionDate && t.executionDate ? format(t.executionDate, 'dd MMMM yyyy', { locale: ar }) : '-'}</TableCell>
                       </Table>
                   </div>
               </CardContent>
