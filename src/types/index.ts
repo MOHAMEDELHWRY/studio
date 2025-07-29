@@ -5,6 +5,7 @@ export type Transaction = {
   showExecutionDate?: boolean;
   dueDate?: Date;
   supplierName: string;
+  customerName?: string;
   governorate?: string;
   city?: string;
   description: string;

@@ -77,6 +77,7 @@ const transactionSchema = z.object({
   showExecutionDate: z.boolean().optional().default(false),
   dueDate: z.date().optional(),
   supplierName: z.string().trim().min(1, 'اسم المورد مطلوب.'),
+  customerName: z.string().trim().optional(),
   governorate: z.string().optional(),
   city: z.string().optional(),
   description: z.string().optional(),
@@ -89,6 +90,50 @@ const transactionSchema = z.object({
   amountPaidToFactory: z.coerce.number().min(0, 'المبلغ المدفوع يجب أن يكون موجبًا.').default(0),
   amountReceivedFromSupplier: z.coerce.number().min(0, 'المبلغ المستلم يجب أن يكون موجبًا.').default(0),
 });
+<<<<<<< REPLACE
+<<<<<<< SEARCH
+                          <FormField control={form.control} name="supplierName" render={({ field }) => (
+                            <FormItem><FormLabel>اسم المورد</FormLabel><FormControl><Input placeholder="اسم المورد" {...field} /></FormControl><FormMessage /></FormItem>
+                          )} />
+=======
+                          <FormField control={form.control} name="supplierName" render={({ field }) => (
+                            <FormItem><FormLabel>اسم العميل</FormLabel><FormControl><Input placeholder="اسم العميل" {...field} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                          <FormField control={form.control} name="customerName" render={({ field }) => (
+                            <FormItem><FormLabel>اسم المورد</FormLabel><FormControl><Input placeholder="اسم المورد" {...field} /></FormControl><FormMessage /></FormItem>
+                          )} />
+<<<<<<< REPLACE
+<<<<<<< SEARCH
+                          <TableHeader><TableRow><TableHead>م</TableHead><TableHead>التاريخ</TableHead><TableHead>تاريخ التنفيذ</TableHead><TableHead>اسم المورد</TableHead><TableHead>الوصف</TableHead><TableHead>المنطقة</TableHead><TableHead>الكمية / التفاصيل</TableHead><TableHead>إجمالي الشراء</TableHead><TableHead>إجمالي البيع</TableHead><TableHead>صافي الربح</TableHead><TableHead>المدفوع للمصنع</TableHead><TableHead>المستلم من المورد</TableHead><TableHead>الإجراءات</TableHead></TableRow></TableHeader>
+=======
+                          <TableHeader><TableRow><TableHead>م</TableHead><TableHead>التاريخ</TableHead><TableHead>تاريخ التنفيذ</TableHead><TableHead>اسم العميل</TableHead><TableHead>اسم المورد</TableHead><TableHead>الوصف</TableHead><TableHead>المنطقة</TableHead><TableHead>الكمية / التفاصيل</TableHead><TableHead>إجمالي الشراء</TableHead><TableHead>إجمالي البيع</TableHead><TableHead>صافي الربح</TableHead><TableHead>المدفوع للمصنع</TableHead><TableHead>المستلم من العميل</TableHead><TableHead>الإجراءات</TableHead></TableRow></TableHeader>
+<<<<<<< REPLACE
+<<<<<<< SEARCH
+                                <TableCell>{t.supplierName}</TableCell>
+                                <TableCell>{t.description}</TableCell>
+                                <TableCell>{t.governorate || '-'}{t.city ? ` - ${t.city}` : ''}</TableCell>
+                                <TableCell>{t.quantity} طن{t.variety ? ` / ${t.variety}` : ''}</TableCell>
+                                <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{t.totalSellingPrice > 0 ? t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }) : '-'}</TableCell>
+                                <TableCell className={t.profit >= 0 ? 'text-success' : 'text-destructive'}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+=======
+                                <TableCell>{t.customerName}</TableCell>
+                                <TableCell>{t.supplierName}</TableCell>
+                                <TableCell>{t.description}</TableCell>
+                                <TableCell>{t.governorate || '-'}{t.city ? ` - ${t.city}` : ''}</TableCell>
+                                <TableCell>{t.quantity} طن{t.variety ? ` / ${t.variety}` : ''}</TableCell>
+                                <TableCell>{t.totalPurchasePrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{t.totalSellingPrice > 0 ? t.totalSellingPrice.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' }) : '-'}</TableCell>
+                                <TableCell className={t.profit >= 0 ? 'text-success' : 'text-destructive'}>{t.profit.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{t.amountPaidToFactory.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+                                <TableCell>{t.amountReceivedFromSupplier.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</TableCell>
+<<<<<<< REPLACE
+<<<<<<< SEARCH
+    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم المورد", "المحافظة", "المركز", "الوصف", "الصنف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من المورد"];
+=======
+    const headers = ["مسلسل", "التاريخ", "تاريخ التنفيذ", "تاريخ الاستحقاق", "اسم العميل", "اسم المورد", "المحافظة", "المركز", "الوصف", "الصنف", "النوع", "الكمية", "سعر الشراء", "إجمالي الشراء", "سعر البيع", "إجمالي البيع", "الضرائب", "الربح", "المدفوع للمصنع", "المستلم من العميل"];
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
